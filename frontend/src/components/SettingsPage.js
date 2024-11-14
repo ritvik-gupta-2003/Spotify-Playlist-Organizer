@@ -1,6 +1,7 @@
 import React from 'react';
 import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
+import ArrowBackIcon from '@material-ui/icons/ArrowBack';
 
 const SettingsContainer = styled.div`
   max-width: 800px;
@@ -55,19 +56,39 @@ const LogoutButton = styled.button`
 `;
 
 const BackButton = styled.button`
-  background: none;
-  border: none;
-  color: var(--text-primary);
-  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 20px;
   margin-bottom: 20px;
-  padding: 8px;
-  border-radius: 4px;
+  transition: background-color 0.2s;
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.1);
+  }
+`;
+
+const DefaultAvatar = styled.div`
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &::after {
+    content: '';
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
   }
 `;
 
@@ -81,14 +102,18 @@ const SettingsPage = ({ user, onLogout }) => {
   return (
     <SettingsContainer>
       <BackButton onClick={() => history.goBack()}>
-        ← Back
+        <ArrowBackIcon /> Back
       </BackButton>
 
       <ProfileSection>
-        <ProfileImage 
-          src={user.images?.[0]?.url || 'default-profile.png'} 
-          alt="Profile"
-        />
+        {user.images?.[0]?.url ? (
+          <ProfileImage 
+            src={user.images[0].url} 
+            alt="Profile"
+          />
+        ) : (
+          <DefaultAvatar />
+        )}
         <ProfileInfo>
           <UserName>{user.display_name}</UserName>
           <UserEmail>{user.email}</UserEmail>

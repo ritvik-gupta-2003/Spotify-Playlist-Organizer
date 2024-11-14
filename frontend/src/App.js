@@ -13,6 +13,30 @@ const App = () => {
   const history = useHistory();
 
   useEffect(() => {
+    const fetchUserData = async () => {
+      const token = localStorage.getItem('spotify_access_token');
+      if (!token || user) return;
+
+      try {
+        const response = await fetch('https://api.spotify.com/v1/me', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch user data');
+        
+        const userData = await response.json();
+        setUser(userData);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, [accessToken]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('access_token');
     const refresh = params.get('refresh_token');
@@ -41,11 +65,16 @@ const App = () => {
       <Route path="/callback" component={CallbackPage} />
       <Route 
         path="/main" 
-        render={() => <MainPage accessToken={localStorage.getItem('spotify_access_token')} setUser={setUser} />} 
+        render={() => <MainPage accessToken={localStorage.getItem('spotify_access_token')} user={user} />} 
       />
       <Route 
         path="/sort" 
-        render={() => <PlaylistSorter accessToken={localStorage.getItem('spotify_access_token')} />} 
+        render={() => (
+          <PlaylistSorter 
+            accessToken={localStorage.getItem('spotify_access_token')} 
+            user={user}
+          />
+        )} 
       />
       <Route 
         path="/settings" 
