@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
@@ -94,9 +94,39 @@ const DefaultAvatar = styled.div`
 
 const SettingsPage = ({ user, onLogout }) => {
   const history = useHistory();
+  const [localUser, setLocalUser] = useState(user || history.location.state?.user);
+  
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch('https://api.spotify.com/v1/me', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('spotify_access_token')}`
+          }
+        });
 
-  if (!user) {
-    return <div>Loading...</div>;
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const userData = await response.json();
+        setLocalUser(userData);
+      } catch (error) {
+        console.error('User data fetch error:', error);
+      }
+    };
+
+    if (!localUser) {
+      fetchUserData();
+    }
+  }, [localUser]);
+
+  if (!localUser) {
+    return (
+      <SettingsContainer>
+        <BackButton onClick={() => history.goBack()}>
+          <ArrowBackIcon /> Back
+        </BackButton>
+        <div>Loading user data...</div>
+      </SettingsContainer>
+    );
   }
 
   return (
@@ -106,17 +136,22 @@ const SettingsPage = ({ user, onLogout }) => {
       </BackButton>
 
       <ProfileSection>
-        {user.images?.[0]?.url ? (
+        {localUser.images && localUser.images[0] && localUser.images[0].url ? (
           <ProfileImage 
-            src={user.images[0].url} 
+            src={localUser.images[0].url} 
             alt="Profile"
+            onError={(e) => {
+              console.error('Profile image failed to load');
+              e.target.style.display = 'none';
+              e.target.parentElement.appendChild(document.createElement('div')).className = 'default-avatar';
+            }}
           />
         ) : (
           <DefaultAvatar />
         )}
         <ProfileInfo>
-          <UserName>{user.display_name}</UserName>
-          <UserEmail>{user.email}</UserEmail>
+          <UserName>{localUser.display_name || 'User'}</UserName>
+          <UserEmail>{localUser.email || 'No email available'}</UserEmail>
           <LogoutButton onClick={onLogout}>
             Logout
           </LogoutButton>

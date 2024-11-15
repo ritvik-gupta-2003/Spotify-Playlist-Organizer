@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useHistory } from 'react-router-dom';
-import styled from 'styled-components';
+import styled, { createGlobalStyle } from 'styled-components';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
+
+const SHOW_AUDIO_FEATURES = false;
 
 const BackButton = styled.button`
   position: absolute;
@@ -52,6 +54,7 @@ const AlbumSection = styled(Section)`
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   padding: 40px 20px 20px;
   gap: 20px;
 `;
@@ -68,35 +71,76 @@ const TrackInfo = styled.div`
   margin-bottom: 20px;
 `;
 
-const MetadataSection = styled(Section)`
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-`;
-
 const MetadataItem = styled.div`
   display: flex;
   justify-content: space-between;
-  padding: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  
-  &:last-child {
-    border-bottom: none;
-  }
+  align-items: center;
+  width: 100%;
+  max-width: 300px;
+  padding: 8px 0;
 `;
 
 const MetadataLabel = styled.span`
-  white-space: nowrap;
+  color: var(--text-secondary);
 `;
 
 const MetadataValue = styled.span`
+  color: var(--text-primary);
   text-align: right;
+`;
+
+const GenreList = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  margin-top: -8px;
+  margin-bottom: -8px;
+`;
+
+const GenreItem = styled.span`
+  color: var(--text-primary);
+  font-size: 0.9em;
+`;
+
+const MetadataSection = styled(Section)`
+  display: flex;
+  flex-direction: column;
+  ${!SHOW_AUDIO_FEATURES && `
+    justify-content: center;
+    align-items: center;
+    font-size: 1.4rem;
+    
+    ${MetadataItem} {
+      margin: 15px 0;
+    }
+    
+    ${MetadataLabel} {
+      font-size: 1.6rem;
+    }
+    
+    ${MetadataValue} {
+      font-size: 1.6rem;
+    }
+    
+    ${GenreList} {
+      font-size: 1.4rem;
+    }
+    
+    ${GenreItem} {
+      font-size: 1.4rem;
+      margin: 5px 0;
+    }
+  `}
+  gap: 15px;
 `;
 
 const PlaylistsSection = styled(Section)`
   display: flex;
   flex-direction: column;
   gap: 10px;
+  height: 100%;
+  overflow: hidden;
 `;
 
 const PlaylistCheckbox = styled.div`
@@ -148,17 +192,19 @@ const PlaylistEntry = styled.div`
   grid-template-columns: 30px 1fr 30px;
   gap: 12px;
   align-items: center;
-  margin-bottom: 8px;
+  height: calc((100% - 90px) / 10);
+  min-height: 40px;
 `;
 
 const PlaylistBox = styled.div`
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 8px;
   background-color: ${props => props.isEmpty ? '#1a1a1a' : 'var(--surface-color)'};
   border-radius: 8px;
   width: 100%;
+  height: 100%;
   border: 2px solid ${props => {
     if (props.isEmpty) return 'none';
     return props.isSelected ? '#1db954' : '#e91429';
@@ -329,6 +375,7 @@ const TrackNumberInput = styled.input`
 const PageContainer = styled.div`
   min-height: 100vh;
   position: relative;
+  overflow: hidden;
   
   &::before {
     content: '';
@@ -474,6 +521,12 @@ const LocalFileError = ({ onPrevious, onNext, hasNextTrack }) => (
   </PopupOverlay>
 );
 
+const GlobalStyle = createGlobalStyle`
+  body {
+    overflow: hidden;
+  }
+`;
+
 const PlaylistSorter = ({ accessToken, user }) => {
   const location = useLocation();
   const history = useHistory();
@@ -503,7 +556,8 @@ const PlaylistSorter = ({ accessToken, user }) => {
   const [showDiscardPopup, setShowDiscardPopup] = useState(false);
   const [userData, setUserData] = useState(user);
   const [showLocalFileError, setShowLocalFileError] = useState(false);
-  const [playableTotalTracks, setPlayableTotalTracks] = useState(0);
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+  const [audioFeaturesCache, setAudioFeaturesCache] = useState({});
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -541,12 +595,37 @@ const PlaylistSorter = ({ accessToken, user }) => {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const data = await response.json();
-        const trackList = data.items.map(item => item.track).filter(track => track && !track.is_local);
+        const trackList = data.items
+          .map(item => item.track)
+          .filter(track => track && !track.is_local);
+        
+        if (SHOW_AUDIO_FEATURES) {
+          const trackIds = trackList.map(track => track.id).join(',');
+          try {
+            const audioResponse = await fetch(
+              `https://api.spotify.com/v1/audio-features?ids=${trackIds}`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+              }
+            );
+
+            if (audioResponse.ok) {
+              const { audio_features } = await audioResponse.json();
+              const newCache = {};
+              audio_features.forEach((features, index) => {
+                if (features) {
+                  newCache[trackList[index].id] = features;
+                }
+              });
+              setAudioFeaturesCache(prev => ({...prev, ...newCache}));
+            }
+          } catch (error) {
+            console.error('Error fetching audio features:', error);
+          }
+        }
         
         setTracks(trackList);
         setCurrentTrack(trackList[0]);
         setTotalTracks(data.total);
-        setPlayableTotalTracks(trackList.length);
         setNextTracksUrl(data.next);
         
         const currentId = playlistId === 'liked' ? 'liked' : playlistId;
@@ -554,6 +633,10 @@ const PlaylistSorter = ({ accessToken, user }) => {
           ...prev,
           [currentId]: new Set(trackList.map(track => track.id))
         }));
+
+        if (trackList.length < 25 && data.next) {
+          fetchMoreTracks();
+        }
       } catch (error) {
         console.error('Error fetching tracks:', error);
         history.push('/main');
@@ -582,30 +665,6 @@ const PlaylistSorter = ({ accessToken, user }) => {
     }
   }, [accessToken, location.search, history]);
 
-  useEffect(() => {
-    const fetchTrackMetadata = async () => {
-      if (currentTrack) {
-        const [metadataResponse, artistResponse] = await Promise.all([
-          fetch(`https://api.spotify.com/v1/audio-features/${currentTrack.id}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          }),
-          fetch(`https://api.spotify.com/v1/artists/${currentTrack.artists[0].id}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          })
-        ]);
-
-        const [metadata, artist] = await Promise.all([
-          metadataResponse.json(),
-          artistResponse.json()
-        ]);
-
-        setTrackMetadata(metadata);
-        setArtistData(artist);
-      }
-    };
-
-    fetchTrackMetadata();
-  }, [currentTrack, accessToken]);
 
   useEffect(() => {
     const updatePlaylistStates = async () => {
@@ -648,13 +707,17 @@ const PlaylistSorter = ({ accessToken, user }) => {
       
       if (nextTrack.is_local) {
         setShowLocalFileError(true);
+        setCurrentIndex(prev => prev + 2);
+        if (currentIndex + 2 < tracks.length) {
+          setCurrentTrack(tracks[currentIndex + 2]);
+        }
       } else {
         setCurrentIndex(prev => prev + 1);
         setCurrentTrack(nextTrack);
-        
-        if (currentIndex >= tracks.length - 6 && nextTracksUrl) {
-          fetchMoreTracks();
-        }
+      }
+      
+      if (currentIndex >= tracks.length - 26 && nextTracksUrl) {
+        fetchMoreTracks();
       }
     }
   }, [currentIndex, tracks, nextTracksUrl]);
@@ -665,6 +728,10 @@ const PlaylistSorter = ({ accessToken, user }) => {
       
       if (prevTrack.is_local) {
         setShowLocalFileError(true);
+        setCurrentIndex(prev => prev - 2);
+        if (currentIndex - 2 >= 0) {
+          setCurrentTrack(tracks[currentIndex - 2]);
+        }
       } else {
         setCurrentIndex(prev => prev - 1);
         setCurrentTrack(prevTrack);
@@ -887,11 +954,40 @@ const PlaylistSorter = ({ accessToken, user }) => {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       
       const data = await response.json();
-      const newTracks = data.items.map(item => item.track).filter(track => track && !track.is_local);
+      const newTracks = data.items
+        .map(item => item.track)
+        .filter(track => track && !track.is_local);
+      
+      if (SHOW_AUDIO_FEATURES) {
+        const trackIds = newTracks.map(track => track.id).join(',');
+        try {
+          const audioResponse = await fetch(
+            `https://api.spotify.com/v1/audio-features?ids=${trackIds}`, {
+              headers: { 'Authorization': `Bearer ${accessToken}` }
+            }
+          );
+
+          if (audioResponse.ok) {
+            const { audio_features } = await audioResponse.json();
+            const newCache = {};
+            audio_features.forEach((features, index) => {
+              if (features) {
+                newCache[newTracks[index].id] = features;
+              }
+            });
+            setAudioFeaturesCache(prev => ({...prev, ...newCache}));
+          }
+        } catch (error) {
+          console.error('Error fetching audio features:', error);
+        }
+      }
       
       setTracks(prev => [...prev, ...newTracks]);
       setNextTracksUrl(data.next);
-      setPlayableTotalTracks(prev => prev + newTracks.length);
+
+      if (newTracks.length < 25 && data.next) {
+        fetchMoreTracks();
+      }
     } catch (error) {
       console.error('Error fetching more tracks:', error);
     } finally {
@@ -1118,6 +1214,42 @@ const PlaylistSorter = ({ accessToken, user }) => {
     handlePrevious();
   };
 
+  useEffect(() => {
+    const fetchArtistData = async () => {
+      if (!currentTrack) return;
+      
+      try {
+        const artistResponse = await fetch(
+          `https://api.spotify.com/v1/artists/${currentTrack.artists[0].id}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          }
+        );
+
+        if (!artistResponse.ok) {
+          throw new Error('Failed to fetch artist data');
+        }
+
+        const artist = await artistResponse.json();
+        setArtistData(artist);
+        
+        // Set initial track metadata (even if we're not showing audio features)
+        setTrackMetadata({
+          tempo: 0,
+          acousticness: 0,
+          danceability: 0,
+          energy: 0,
+          instrumentalness: 0,
+          loudness: 0,
+          valence: 0
+        });
+      } catch (error) {
+        console.error('Error fetching artist data:', error);
+      }
+    };
+
+    fetchArtistData();
+  }, [currentTrack, accessToken]);
+
   if (!currentTrack || !trackMetadata || !artistData) return <div>Loading...</div>;
 
   const formatDuration = (ms) => {
@@ -1127,266 +1259,241 @@ const PlaylistSorter = ({ accessToken, user }) => {
   };
 
   return (
-    <PageContainer colors={backgroundColors}>
-      <ProgressBar progress={currentIndex + 1} total={playableTotalTracks} />
-      <BackButton onClick={handleBack}>
-        <ArrowBackIcon /> Back
-      </BackButton>
-      <ProfileButton onClick={handleProfileClick}>
-        {userData?.images?.[0]?.url ? (
-          <img 
-            src={userData.images[0].url} 
-            alt="Profile" 
-          />
-        ) : (
-          <DefaultAvatar />
+    <>
+      <GlobalStyle />
+      <PageContainer colors={backgroundColors}>
+        <ProgressBar 
+          progress={currentIndex + 1} 
+          total={totalTracks}
+        />
+        <BackButton onClick={handleBack}>
+          <ArrowBackIcon /> Back
+        </BackButton>
+
+        <TrackCounter>
+          <TrackNumberInput 
+            value={jumpToTrack || currentIndex + 1}
+            onChange={handleTrackNumberInput}
+            onBlur={() => setJumpToTrack('')}
+            type="number"
+            min="1"
+            max={totalTracks}
+          /> / {totalTracks}
+          {isLoadingMore && <span> (Loading more...)</span>}
+        </TrackCounter>
+
+        {loadingPlaylist && (
+          <LoadingOverlay>
+            Loading playlist tracks...
+          </LoadingOverlay>
         )}
-      </ProfileButton>
 
-      <TrackCounter>
-        <TrackNumberInput 
-          value={jumpToTrack || currentIndex + 1}
-          onChange={handleTrackNumberInput}
-          onBlur={() => setJumpToTrack('')}
-          type="number"
-          min="1"
-          max={playableTotalTracks}
-        /> / {playableTotalTracks}
-        {isLoadingMore && <span> (Loading more...)</span>}
-      </TrackCounter>
+        <SorterContainer>
+          <AlbumSection>
+            <AlbumArt src={currentTrack.album.images[0].url} alt="Album Art" />
+            <TrackInfo>
+              <h2>{currentTrack.name}</h2>
+              <p>{currentTrack.artists.map(artist => artist.name).join(', ')}</p>
+              <p>{currentTrack.album.name}</p>
+            </TrackInfo>
+            <SpotifyEmbed 
+              src={`https://open.spotify.com/embed/track/${currentTrack.id}`}
+              allow="encrypted-media"
+            />
+          </AlbumSection>
 
-      {loadingPlaylist && (
-        <LoadingOverlay>
-          Loading playlist tracks...
-        </LoadingOverlay>
-      )}
+          <MetadataSection>
+            <MetadataItem>
+              <MetadataLabel>Artist Genres</MetadataLabel>
+              <GenreList>
+                {(artistData?.genres || [])
+                  .slice(0, 3)
+                  .map((genre, index) => (
+                    <GenreItem key={index}>
+                      {genre.split(' ')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(' ')}
+                    </GenreItem>
+                  ))}
+              </GenreList>
+            </MetadataItem>
+            <MetadataItem>
+              <MetadataLabel>Length</MetadataLabel>
+              <MetadataValue>{formatDuration(currentTrack.duration_ms)}</MetadataValue>
+            </MetadataItem>
+          </MetadataSection>
 
-      <SorterContainer>
-        <AlbumSection>
-          <AlbumArt src={currentTrack.album.images[0].url} alt="Album Art" />
-          <TrackInfo>
-            <h2>{currentTrack.name}</h2>
-            <p>{currentTrack.artists.map(artist => artist.name).join(', ')}</p>
-            <p>{currentTrack.album.name}</p>
-          </TrackInfo>
-          <SpotifyEmbed 
-            src={`https://open.spotify.com/embed/track/${currentTrack.id}`}
-            allow="encrypted-media"
-          />
-        </AlbumSection>
-
-        <MetadataSection>
-          <MetadataItem>
-            <MetadataLabel>Artist Genres</MetadataLabel>
-            <MetadataValue>
-              {artistData.genres
-                .map(genre => genre.split(' ')
-                  .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                  .join(' '))
-                .join(', ') || 'N/A'}
-            </MetadataValue>
-          </MetadataItem>
-          <MetadataItem>
-            <span>Length</span>
-            <span>{formatDuration(currentTrack.duration_ms)}</span>
-          </MetadataItem>
-          <MetadataItem>
-            <span>Tempo</span>
-            <span>{Math.round(trackMetadata.tempo)} BPM</span>
-          </MetadataItem>
-          <MetadataItem>
-            <span>Acousticness</span>
-            <span>{Math.round(trackMetadata.acousticness * 100)}%</span>
-          </MetadataItem>
-          <MetadataItem>
-            <span>Danceability</span>
-            <span>{Math.round(trackMetadata.danceability * 100)}%</span>
-          </MetadataItem>
-          <MetadataItem>
-            <span>Energy</span>
-            <span>{Math.round(trackMetadata.energy * 100)}%</span>
-          </MetadataItem>
-          <MetadataItem>
-            <span>Instrumentalness</span>
-            <span>{Math.round(trackMetadata.instrumentalness * 100)}%</span>
-          </MetadataItem>
-          <MetadataItem>
-            <span>Loudness</span>
-            <span>{trackMetadata.loudness.toFixed(1)} dB</span>
-          </MetadataItem>
-          <MetadataItem>
-            <span>Valence</span>
-            <span>{Math.round(trackMetadata.valence * 100)}%</span>
-          </MetadataItem>
-        </MetadataSection>
-
-        <PlaylistsSection>
-          {Array.from({length: 10}).map((_, index) => (
-            <PlaylistEntry key={index}>
-              <PlaylistNumber>{index}</PlaylistNumber>
-              <PlaylistBox 
-                isEmpty={!selectedPlaylists[index]}
-                isSelected={selectedStates[selectedPlaylists[index]?.id]}
-                onClick={() => {
-                  if (selectedPlaylists[index]) {
-                    togglePlaylist(selectedPlaylists[index].id);
-                  }
-                }}
-              >
-                {selectedPlaylists[index] ? (
-                  <>
-                    {selectedPlaylists[index].images && selectedPlaylists[index].images.length > 0 ? (
-                      <img 
-                        src={selectedPlaylists[index].images[0].url} 
-                        alt="" 
-                        style={{width: 40, height: 40, borderRadius: 4}}
-                      />
-                    ) : (
-                      <div style={{ width: 40, height: 40, background: '#282828', borderRadius: 4 }} />
-                    )}
-                    <span>{selectedPlaylists[index].name}</span>
-                  </>
-                ) : (
-                  <PlaylistSearchBox>
-                    {!showingSearchBox[index] && !showingCreateNew[index] ? (
-                      <PlaylistSelectionOptions>
-                        <SelectionOption 
-                          onClick={() => {
-                            setShowingSearchBox(prev => ({...prev, [index]: true}));
-                            setTimeout(() => {
-                              const input = document.querySelector(`#playlist-search-${index}`);
-                              if (input) input.focus();
-                            }, 0);
-                          }}
-                        >
-                          Select A Playlist
-                        </SelectionOption>
-                        <SelectionOption onClick={() => setShowingCreateNew(prev => ({...prev, [index]: true}))}>
-                          Create New Playlist
-                        </SelectionOption>
-                      </PlaylistSelectionOptions>
-                    ) : showingCreateNew[index] ? (
-                      <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                        <PlaylistInput
-                          placeholder="Enter playlist name..."
-                          value={newPlaylistName[index] || ''}
-                          onChange={(e) => setNewPlaylistName(prev => ({...prev, [index]: e.target.value}))}
-                          onKeyDown={async (e) => {
-                            if (e.key === 'Enter' && newPlaylistName[index]?.trim()) {
-                              e.preventDefault();
-                              const newPlaylist = await createNewPlaylist(newPlaylistName[index]);
-                              if (newPlaylist) {
-                                selectPlaylist(index, newPlaylist);
-                                setNewPlaylistName(prev => ({...prev, [index]: ''}));
-                                setShowingCreateNew(prev => ({...prev, [index]: false}));
-                              }
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
-                              setShowingCreateNew(prev => ({...prev, [index]: false}));
-                              setNewPlaylistName(prev => ({...prev, [index]: ''}));
-                            }
-                          }}
+          <PlaylistsSection>
+            {Array.from({length: 10}).map((_, index) => (
+              <PlaylistEntry key={index}>
+                <PlaylistNumber>{index}</PlaylistNumber>
+                <PlaylistBox 
+                  isEmpty={!selectedPlaylists[index]}
+                  isSelected={selectedStates[selectedPlaylists[index]?.id]}
+                  onClick={() => {
+                    if (selectedPlaylists[index]) {
+                      togglePlaylist(selectedPlaylists[index].id);
+                    }
+                  }}
+                >
+                  {selectedPlaylists[index] ? (
+                    <>
+                      {selectedPlaylists[index].images && selectedPlaylists[index].images.length > 0 ? (
+                        <img 
+                          src={selectedPlaylists[index].images[0].url} 
+                          alt="" 
+                          style={{width: 40, height: 40, borderRadius: 4}}
                         />
-                        <RemoveButton onClick={() => {
-                          setShowingCreateNew(prev => ({...prev, [index]: false}));
-                          setNewPlaylistName(prev => ({...prev, [index]: ''}));
-                        }}>×</RemoveButton>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                        <PlaylistInput 
-                          id={`playlist-search-${index}`}
-                          placeholder="Select A Playlist"
-                          autoFocus
-                          onFocus={() => setActiveDropdown(index)}
-                          onChange={(e) => handlePlaylistSearch(e.target.value)}
-                          onKeyDown={(e) => handleSearchKeyDown(e, index)}
-                        />
-                        <RemoveButton 
-                          onClick={() => {
-                            setShowingSearchBox(prev => ({...prev, [index]: false}));
-                            setActiveDropdown(null);
-                          }}
-                        >
-                          ×
-                        </RemoveButton>
-                      </div>
-                    )}
-                    {activeDropdown === index && (
-                      <PlaylistDropdown>
-                        {getAvailablePlaylists().map(playlist => (
-                          <PlaylistOption 
-                            key={playlist.id}
+                      ) : (
+                        <div style={{ width: 40, height: 40, background: '#282828', borderRadius: 4 }} />
+                      )}
+                      <span>{selectedPlaylists[index].name}</span>
+                    </>
+                  ) : (
+                    <PlaylistSearchBox>
+                      {!showingSearchBox[index] && !showingCreateNew[index] ? (
+                        <PlaylistSelectionOptions>
+                          <SelectionOption 
                             onClick={() => {
-                              selectPlaylist(index, playlist);
-                              setShowingSearchBox(prev => ({...prev, [index]: false}));
+                              setShowingSearchBox(prev => ({...prev, [index]: true}));
+                              setTimeout(() => {
+                                const input = document.querySelector(`#playlist-search-${index}`);
+                                if (input) input.focus();
+                              }, 0);
                             }}
                           >
-                            {playlist.images && playlist.images.length > 0 ? (
-                              <img src={playlist.images[0].url} alt="" />
-                            ) : (
-                              <div style={{ width: 40, height: 40, background: '#282828', borderRadius: 4 }} />
-                            )}
-                            <span>{playlist.name}</span>
-                          </PlaylistOption>
-                        ))}
-                      </PlaylistDropdown>
-                    )}
-                  </PlaylistSearchBox>
+                            Select A Playlist
+                          </SelectionOption>
+                          <SelectionOption onClick={() => setShowingCreateNew(prev => ({...prev, [index]: true}))}>
+                            Create New Playlist
+                          </SelectionOption>
+                        </PlaylistSelectionOptions>
+                      ) : showingCreateNew[index] ? (
+                        <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                          <PlaylistInput
+                            placeholder="Enter playlist name..."
+                            value={newPlaylistName[index] || ''}
+                            onChange={(e) => setNewPlaylistName(prev => ({...prev, [index]: e.target.value}))}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && newPlaylistName[index]?.trim()) {
+                                e.preventDefault();
+                                const newPlaylist = await createNewPlaylist(newPlaylistName[index]);
+                                if (newPlaylist) {
+                                  selectPlaylist(index, newPlaylist);
+                                  setNewPlaylistName(prev => ({...prev, [index]: ''}));
+                                  setShowingCreateNew(prev => ({...prev, [index]: false}));
+                                }
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                setShowingCreateNew(prev => ({...prev, [index]: false}));
+                                setNewPlaylistName(prev => ({...prev, [index]: ''}));
+                              }
+                            }}
+                          />
+                          <RemoveButton onClick={() => {
+                            setShowingCreateNew(prev => ({...prev, [index]: false}));
+                            setNewPlaylistName(prev => ({...prev, [index]: ''}));
+                          }}>×</RemoveButton>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                          <PlaylistInput 
+                            id={`playlist-search-${index}`}
+                            placeholder="Select A Playlist"
+                            autoFocus
+                            onFocus={() => setActiveDropdown(index)}
+                            onChange={(e) => handlePlaylistSearch(e.target.value)}
+                            onKeyDown={(e) => handleSearchKeyDown(e, index)}
+                          />
+                          <RemoveButton 
+                            onClick={() => {
+                              setShowingSearchBox(prev => ({...prev, [index]: false}));
+                              setActiveDropdown(null);
+                            }}
+                          >
+                            ×
+                          </RemoveButton>
+                        </div>
+                      )}
+                      {activeDropdown === index && (
+                        <PlaylistDropdown>
+                          {getAvailablePlaylists().map(playlist => (
+                            <PlaylistOption 
+                              key={playlist.id}
+                              onClick={() => {
+                                selectPlaylist(index, playlist);
+                                setShowingSearchBox(prev => ({...prev, [index]: false}));
+                              }}
+                            >
+                              {playlist.images && playlist.images.length > 0 ? (
+                                <img src={playlist.images[0].url} alt="" />
+                              ) : (
+                                <div style={{ width: 40, height: 40, background: '#282828', borderRadius: 4 }} />
+                              )}
+                              <span>{playlist.name}</span>
+                            </PlaylistOption>
+                          ))}
+                        </PlaylistDropdown>
+                      )}
+                    </PlaylistSearchBox>
+                  )}
+                </PlaylistBox>
+                {selectedPlaylists[index] && (
+                  <RemoveButton onClick={() => removePlaylist(index)}></RemoveButton>
                 )}
-              </PlaylistBox>
-              {selectedPlaylists[index] && (
-                <RemoveButton onClick={() => removePlaylist(index)}>×</RemoveButton>
-              )}
-            </PlaylistEntry>
-          ))}
-        </PlaylistsSection>
-      </SorterContainer>
+              </PlaylistEntry>
+            ))}
+          </PlaylistsSection>
+        </SorterContainer>
 
-      <NavigationButtons>
-        <Button onClick={handlePrevious} disabled={currentIndex === 0}>
-          Previous
-        </Button>
-        <Button 
-          onClick={() => {
-            setUnsavedChanges([]);
-            setShowDiscardPopup(true);
-          }} 
-          variant="secondary"
-        >
-          Discard
-        </Button>
-        <Button onClick={handleSave}>Save</Button>
-        <Button onClick={handleNext} disabled={currentIndex === tracks.length - 1}>
-          Next
-        </Button>
-      </NavigationButtons>
+        <NavigationButtons>
+          <Button onClick={handlePrevious} disabled={currentIndex === 0}>
+            Previous
+          </Button>
+          <Button 
+            onClick={() => {
+              setUnsavedChanges([]);
+              setShowDiscardPopup(true);
+            }} 
+            variant="secondary"
+          >
+            Discard
+          </Button>
+          <Button onClick={handleSave}>Save</Button>
+          <Button onClick={handleNext} disabled={currentIndex === tracks.length - 1}>
+            Next
+          </Button>
+        </NavigationButtons>
 
-      <ProgressBar progress={currentIndex + 1} total={playableTotalTracks} />
-
-      {showUnsavedPopup && (
-        <UnsavedChangesPopup
-          onSave={() => handlePopupAction('save')}
-          onDiscard={() => handlePopupAction('discard')}
-          onCancel={() => {
-            setShowUnsavedPopup(false);
-            setPendingAction(null);
-          }}
+        <ProgressBar 
+          progress={currentIndex + 1} 
+          total={totalTracks}
         />
-      )}
 
-      {showDiscardPopup && (
-        <DiscardChangesPopup onClose={() => setShowDiscardPopup(false)} />
-      )}
+        {showUnsavedPopup && (
+          <UnsavedChangesPopup
+            onSave={() => handlePopupAction('save')}
+            onDiscard={() => handlePopupAction('discard')}
+            onCancel={() => {
+              setShowUnsavedPopup(false);
+              setPendingAction(null);
+            }}
+          />
+        )}
 
-      {showLocalFileError && (
-        <LocalFileError 
-          onPrevious={handleLocalFilePrevious}
-          onNext={handleLocalFileNext}
-          hasNextTrack={currentIndex < tracks.length - 1}
-        />
-      )}
-    </PageContainer>
+        {showDiscardPopup && (
+          <DiscardChangesPopup onClose={() => setShowDiscardPopup(false)} />
+        )}
+
+        {showLocalFileError && (
+          <LocalFileError 
+            onPrevious={handleLocalFilePrevious}
+            onNext={handleLocalFileNext}
+            hasNextTrack={currentIndex < tracks.length - 1}
+          />
+        )}
+      </PageContainer>
+    </>
   );
 };
 

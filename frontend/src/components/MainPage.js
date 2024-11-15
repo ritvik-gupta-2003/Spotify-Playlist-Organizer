@@ -210,7 +210,30 @@ const MainPage = ({ accessToken, user }) => {
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [showEmptyPlaylistPopup, setShowEmptyPlaylistPopup] = useState(false);
   const [likedSongsCount, setLikedSongsCount] = useState(0);
+  const [localUser, setLocalUser] = useState(user);
   const history = useHistory();
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch('https://api.spotify.com/v1/me', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const userData = await response.json();
+        setLocalUser(userData);
+      } catch (error) {
+        console.error('User data fetch error:', error);
+      }
+    };
+
+    if (!localUser && accessToken) {
+      fetchUserData();
+    }
+  }, [accessToken, localUser]);
 
   useEffect(() => {
     const fetchLikedSongs = async () => {
@@ -390,11 +413,16 @@ const MainPage = ({ accessToken, user }) => {
               Create New Playlist
             </CreateButton>
           )}
-          <ProfileButton onClick={() => history.push('/settings')}>
-            {user?.images?.[0]?.url ? (
+          <ProfileButton onClick={() => history.push('/settings', { user: localUser })}>
+            {localUser && localUser.images && localUser.images[0] && localUser.images[0].url ? (
               <img 
-                src={user.images[0].url} 
-                alt="Profile" 
+                src={localUser.images[0].url} 
+                alt="Profile"
+                onError={(e) => {
+                  console.error('Profile image failed to load');
+                  e.target.style.display = 'none';
+                  e.target.parentElement.appendChild(document.createElement('div')).className = 'default-avatar';
+                }}
               />
             ) : (
               <DefaultAvatar />
