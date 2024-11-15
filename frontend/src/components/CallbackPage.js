@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
+import { API_URL } from '../config';
 
 const CallbackPage = () => {
   const history = useHistory();
@@ -11,8 +12,12 @@ const CallbackPage = () => {
       
       if (code) {
         try {
-          const response = await fetch(`http://localhost:5010/callback?code=${code}`, {
-            credentials: 'include'
+          const response = await fetch(`${API_URL}/callback?code=${code}`, {
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+              'Origin': window.location.origin
+            }
           });
           
           if (!response.ok) {
@@ -23,7 +28,6 @@ const CallbackPage = () => {
           localStorage.setItem('spotify_access_token', data.access_token);
           localStorage.setItem('spotify_refresh_token', data.refresh_token);
           
-          // Clean URL and redirect to main page
           history.replace('/main');
         } catch (error) {
           console.error('Callback error:', error);

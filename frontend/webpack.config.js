@@ -1,3 +1,4 @@
+const webpack = require('webpack');
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
@@ -13,12 +14,7 @@ module.exports = {
       {
         test: /\.(js|jsx)$/,
         exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-react']
-          }
-        }
+        use: ['babel-loader']
       },
       {
         test: /\.css$/,
@@ -27,12 +23,17 @@ module.exports = {
     ]
   },
   plugins: [
+    new webpack.DefinePlugin({
+      'process.env.REACT_APP_API_URL': JSON.stringify(process.env.REACT_APP_API_URL || 'https://spotify-playlist-backend-a0e8b9eecd59.herokuapp.com')
+    }),
     new HtmlWebpackPlugin({
       template: './public/index.html'
     })
   ],
+  resolve: {
+    extensions: ['.js', '.jsx']
+  },
   devServer: {
-    historyApiFallback: true,
-    port: 8080
+    historyApiFallback: true
   }
 }; 

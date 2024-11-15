@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+import { API_URL } from '../config';
 
 const LoginContainer = styled.div`
   height: 100vh;
@@ -29,23 +30,34 @@ const LoginButton = styled.button`
 const LoginPage = () => {
   const handleLogin = async () => {
     try {
-      const response = await fetch('http://localhost:5010/login', {
+      console.log('Attempting login request...');
+      const response = await fetch(`${API_URL}/login`, {
         method: 'GET',
+        mode: 'cors',
         credentials: 'include',
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin
+        }
       });
+      
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log('Response data:', data);
       window.location.href = data.url;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Login error details:', {
+        message: error.message,
+        stack: error.stack,
+        headers: error.headers
+      });
     }
   };
 

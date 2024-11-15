@@ -1,0 +1,1 @@
+export const API_URL = process.env.REACT_APP_API_URL || 'https://spotify-playlist-backend-a0e8b9eecd59.herokuapp.com';

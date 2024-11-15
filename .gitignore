@@ -1,2 +1,22 @@
+# Environment variables
 .env
+frontend/.env
+backend/.env
+
+# Dependencies
 frontend/node_modules
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+
+# Build outputs
+frontend/dist
+frontend/build
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
