@@ -254,36 +254,43 @@ const MainPage = ({ accessToken, user }) => {
 
     const fetchAllPlaylists = async () => {
       setIsLoading(true);
-      const playlistMap = new Map();
-      let nextUrl = 'https://api.spotify.com/v1/me/playlists?limit=50';
-
       try {
-        while (nextUrl) {
-          const response = await fetch(nextUrl, {
-            headers: {
-              Authorization: `Bearer ${accessToken}`
-            }
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        const response = await fetch('https://api.spotify.com/v1/me/playlists?limit=50', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
           }
+        });
 
-          const data = await response.json();
-          
-          data.items.forEach(playlist => {
-            if (!playlistMap.has(playlist.id)) {
-              playlistMap.set(playlist.id, playlist);
-            }
-          });
-          
-          nextUrl = data.next;
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const uniquePlaylists = Array.from(playlistMap.values());
-        setPlaylists(uniquePlaylists);
+        const data = await response.json();
+        const validPlaylists = data.items.filter(playlist => playlist && playlist.id);
+        
+        // Fetch track counts for each playlist
+        await Promise.all(validPlaylists.map(async (playlist) => {
+          try {
+            const tracksResponse = await fetch(playlist.tracks.href, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`
+              }
+            });
+            
+            if (tracksResponse.ok) {
+              const tracksData = await tracksResponse.json();
+              playlist.tracks.total = tracksData.total;
+            }
+          } catch (error) {
+            console.error(`Error fetching tracks for playlist ${playlist.id}:`, error);
+            playlist.tracks.total = 0;
+          }
+        }));
+
+        setPlaylists(validPlaylists);
       } catch (error) {
         console.error('Playlists fetch error:', error);
+        setPlaylists([]);
       } finally {
         setIsLoading(false);
       }
