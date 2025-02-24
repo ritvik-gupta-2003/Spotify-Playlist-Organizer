@@ -65,7 +65,7 @@ const LoginPage = () => {
     <LoginContainer>
       <h1>Playlist Organizer</h1>
       <LoginButton onClick={handleLogin}>
-        Login with Spotify
+        Login with your Spotify
       </LoginButton>
     </LoginContainer>
   );
