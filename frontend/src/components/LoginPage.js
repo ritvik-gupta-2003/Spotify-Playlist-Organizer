@@ -51,6 +51,7 @@ const LoginPage = () => {
       
       const data = await response.json();
       console.log('Response data:', data);
+      console.log('Redirecting to Spotify authorization URL:', data.url);
       window.location.href = data.url;
     } catch (error) {
       console.error('Login error details:', {

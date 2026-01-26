@@ -278,7 +278,16 @@ const MainPage = ({ accessToken, user }) => {
           nextUrl = data.next;
         }
 
-        setPlaylists(allPlaylists);
+        // Deduplicate playlists by ID to prevent duplicate keys
+        const uniquePlaylistsMap = new Map();
+        allPlaylists.forEach(playlist => {
+          if (playlist && playlist.id && !uniquePlaylistsMap.has(playlist.id)) {
+            uniquePlaylistsMap.set(playlist.id, playlist);
+          }
+        });
+        const uniquePlaylists = Array.from(uniquePlaylistsMap.values());
+
+        setPlaylists(uniquePlaylists);
       } catch (error) {
         console.error('Playlists fetch error:', error);
         setPlaylists([]);
@@ -367,7 +376,7 @@ const MainPage = ({ accessToken, user }) => {
   return (
     <MainContainer>
       <Header>
-        <h1>Your Playlists</h1>
+        <h1>Your Playlists!</h1>
         <HeaderContent>
           <SearchInput
             type="text"

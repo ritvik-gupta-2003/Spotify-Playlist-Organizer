@@ -26,11 +26,15 @@
     "@babel/preset-env": "^7.14.8"
   },
   "devDependencies": {
-    "webpack-dev-server": "^3.11.2"
+    "webpack-dev-server": "^4.15.1"
   },
   "scripts": {
     "start": "node server.js",
+    "start:dev": "webpack serve --mode development",
     "build": "webpack --mode production --progress",
+    "build:dev": "webpack --mode development --progress",
+    "dev": "npm run start:dev",
+    "dev:watch": "webpack --mode development --watch",
     "heroku-postbuild": "REACT_APP_API_URL=https://spotify-playlist-backend-a0e8b9eecd59.herokuapp.com npm run build",
     "start:prod": "node server.js"
   }
