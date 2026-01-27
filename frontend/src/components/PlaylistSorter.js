@@ -1950,7 +1950,14 @@ const PlaylistSorter = ({ accessToken, user }) => {
     fetchArtistData();
   }, [currentTrack, accessToken]);
 
-  if (!currentTrack || !trackMetadata || !artistData) return <div>Loading...</div>;
+  if (!currentTrack || !trackMetadata || !artistData) {
+    return (
+      <GlobalLoadingOverlay>
+        <LoadingSpinner />
+        <LoadingText>Loading...</LoadingText>
+      </GlobalLoadingOverlay>
+    );
+  }
 
   const formatDuration = (ms) => {
     const minutes = Math.floor(ms / 60000);
