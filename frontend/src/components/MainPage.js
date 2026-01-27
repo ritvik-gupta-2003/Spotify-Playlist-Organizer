@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 import PlaylistSelector from './PlaylistSelector';
+import LikedSongsIcon from '../images/LikedSongsIcon.png';
 
 const MainContainer = styled.div`
   padding: 40px 20px;
@@ -12,8 +13,23 @@ const MainContainer = styled.div`
 const Header = styled.div`
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 40px;
+  align-items: flex-start;
+  margin-bottom: 48px;
+  flex-wrap: wrap;
+  gap: 20px;
+`;
+
+const HeaderTitle = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const Subtitle = styled.p`
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 400;
+  margin: 0;
 `;
 
 const HeaderContent = styled.div`
@@ -27,14 +43,20 @@ const SearchInput = styled.input`
   background-color: var(--surface-color);
   border: none;
   padding: 12px 20px;
-  border-radius: 20px;
+  border-radius: 24px;
   color: var(--text-primary);
   width: 300px;
   font-size: 16px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:focus {
     outline: none;
     box-shadow: 0 0 0 2px var(--primary-color);
+    transform: scale(1.02);
+  }
+
+  &::placeholder {
+    color: var(--text-secondary);
   }
 `;
 
@@ -133,22 +155,23 @@ const EmptyPlaylistPopup = ({ onClose }) => (
   </PopupOverlay>
 );
 
-const LIKED_SONGS_ICON = '/images/LikedSongsIcon.png';
-
 const CreateButton = styled.button`
   background-color: var(--primary-color);
   color: white;
   border: none;
   padding: 12px 24px;
-  border-radius: 20px;
+  border-radius: 24px;
   cursor: pointer;
   font-weight: bold;
   display: flex;
   align-items: center;
   gap: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(29, 185, 84, 0.2);
 
   &:hover {
     transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(29, 185, 84, 0.4);
   }
 `;
 
@@ -376,7 +399,10 @@ const MainPage = ({ accessToken, user }) => {
   return (
     <MainContainer>
       <Header>
-        <h1>Your Playlists!</h1>
+        <HeaderTitle>
+          <h1>Your Playlists!</h1>
+          <Subtitle>Select a playlist to organize</Subtitle>
+        </HeaderTitle>
         <HeaderContent>
           <SearchInput
             type="text"
@@ -443,7 +469,7 @@ const MainPage = ({ accessToken, user }) => {
           {
             id: 'liked',
             name: `Your Liked Songs`,
-            images: [],
+            images: [{ url: LikedSongsIcon }],
             isLiked: true,
             tracks: { total: likedSongsCount }
           },
