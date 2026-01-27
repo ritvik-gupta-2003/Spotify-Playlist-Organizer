@@ -400,7 +400,7 @@ const MainPage = ({ accessToken, user }) => {
     <MainContainer>
       <Header>
         <HeaderTitle>
-          <h1>Your Playlists!</h1>
+          <h1>Your Playlists</h1>
           <Subtitle>Select a playlist to organize</Subtitle>
         </HeaderTitle>
         <HeaderContent>
