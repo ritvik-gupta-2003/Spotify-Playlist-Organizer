@@ -9,6 +9,7 @@ import PlaylistSelector from './PlaylistSelector';
 import EmptyPlaylistPopup from './popups/EmptyPlaylistPopup';
 import ProfileButton from './ui/ProfileButton';
 import LikedSongsIcon from '../images/LikedSongsIcon.png';
+import MusicStreamingAPI from '../services/MusicStreamingAPI';
 
 /**
  * Background layer for blurred profile picture
@@ -206,14 +207,12 @@ const MainPage = ({ accessToken, user }) => {
     const fetchUserData = async () => {
       if (!localUser && accessToken) {
         try {
-          const response = await fetch('https://api.spotify.com/v1/me', {
-            headers: {
-              Authorization: `Bearer ${accessToken}`
-            }
-          });
-
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const userData = await response.json();
+          // Initialize API if not already done
+          if (!MusicStreamingAPI.isInitialized()) {
+            MusicStreamingAPI.initialize(accessToken, 'spotify');
+          }
+          
+          const userData = await MusicStreamingAPI.getUserData();
           setLocalUser(userData);
         } catch (error) {
           console.error('User data fetch error:', error);
@@ -226,14 +225,12 @@ const MainPage = ({ accessToken, user }) => {
      */
     const fetchLikedSongs = async () => {
       try {
-        const response = await fetch('https://api.spotify.com/v1/me/tracks?limit=1', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          }
-        });
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
+        // Initialize API if not already done
+        if (!MusicStreamingAPI.isInitialized()) {
+          MusicStreamingAPI.initialize(accessToken, 'spotify');
+        }
+        
+        const data = await MusicStreamingAPI.getLikedTracks(1);
         setLikedSongsCount(data.total);
       } catch (error) {
         console.error('Liked songs fetch error:', error);
@@ -243,38 +240,13 @@ const MainPage = ({ accessToken, user }) => {
     const fetchAllPlaylists = async () => {
       setIsLoading(true);
       try {
-        let allPlaylists = [];
-        let nextUrl = 'https://api.spotify.com/v1/me/playlists?limit=50';
-
-        // Keep fetching while there's a next page
-        while (nextUrl) {
-          const response = await fetch(nextUrl, {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`
-            }
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const data = await response.json();
-          const validPlaylists = data.items.filter(playlist => playlist && playlist.id);
-          allPlaylists = [...allPlaylists, ...validPlaylists];
-          
-          // Get the next page URL from the response
-          nextUrl = data.next;
+        // Initialize API if not already done
+        if (!MusicStreamingAPI.isInitialized()) {
+          MusicStreamingAPI.initialize(accessToken, 'spotify');
         }
-
-        // Deduplicate playlists by ID to prevent duplicate keys
-        const uniquePlaylistsMap = new Map();
-        allPlaylists.forEach(playlist => {
-          if (playlist && playlist.id && !uniquePlaylistsMap.has(playlist.id)) {
-            uniquePlaylistsMap.set(playlist.id, playlist);
-          }
-        });
-        const uniquePlaylists = Array.from(uniquePlaylistsMap.values());
-
+        
+        // Get all playlists (pagination handled by adapter)
+        const uniquePlaylists = await MusicStreamingAPI.getAllUserPlaylists();
         setPlaylists(uniquePlaylists);
       } catch (error) {
         console.error('Playlists fetch error:', error);
@@ -329,24 +301,18 @@ const MainPage = ({ accessToken, user }) => {
         throw new Error('User data not available');
       }
       
-      const createResponse = await fetch(`https://api.spotify.com/v1/users/${localUser.id}/playlists`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: name,
-          public: false,
-          description: 'Created with Playlist Sorter'
-        })
-      });
-      
-      if (!createResponse.ok) {
-        throw new Error('Failed to create playlist');
+      // Initialize API if not already done
+      if (!MusicStreamingAPI.isInitialized()) {
+        MusicStreamingAPI.initialize(accessToken, 'spotify');
       }
       
-      const newPlaylist = await createResponse.json();
+      const newPlaylist = await MusicStreamingAPI.createPlaylist(
+        localUser.id,
+        name,
+        'Created with Playlist Sorter',
+        false
+      );
+      
       return newPlaylist;
     } catch (error) {
       console.error('Error creating playlist:', error);

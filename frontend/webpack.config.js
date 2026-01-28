@@ -31,7 +31,8 @@ module.exports = (env, argv) => {
     },
     plugins: [
       new webpack.DefinePlugin({
-        'process.env.REACT_APP_API_URL': JSON.stringify(process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? 'https://spotify-playlist-backend-a0e8b9eecd59.herokuapp.com' : 'http://localhost:5000'))
+        'process.env.REACT_APP_API_URL': JSON.stringify(process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? 'https://spotify-playlist-backend-a0e8b9eecd59.herokuapp.com' : 'http://localhost:5000')),
+        'process.env.REACT_APP_STREAMING_SERVICE': JSON.stringify(process.env.REACT_APP_STREAMING_SERVICE || 'spotify')
       }),
       new HtmlWebpackPlugin({
         template: './public/index.html'

@@ -10,6 +10,7 @@ import UnsavedChangesPopup from './popups/UnsavedChangesPopup';
 import DiscardChangesPopup from './popups/DiscardChangesPopup';
 import LocalFileError from './popups/LocalFileErrorPopup';
 import LoadingOverlay from './ui/LoadingOverlay';
+import MusicStreamingAPI from '../services/MusicStreamingAPI';
 
 const BackButton = styled.button`
   position: absolute;
@@ -770,13 +771,12 @@ const PlaylistSorter = ({ accessToken, user }) => {
     const fetchUserData = async () => {
       if (!userData) {
         try {
-          const response = await fetch('https://api.spotify.com/v1/me', {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          });
+          // Initialize API if not already done
+          if (!MusicStreamingAPI.isInitialized()) {
+            MusicStreamingAPI.initialize(accessToken, 'spotify');
+          }
           
-          if (!response.ok) throw new Error('Failed to fetch user data');
-          
-          const data = await response.json();
+          const data = await MusicStreamingAPI.getUserData();
           setUserData(data);
         } catch (error) {
           console.error('Error fetching user data:', error);
@@ -846,18 +846,15 @@ const PlaylistSorter = ({ accessToken, user }) => {
      */
     const fetchInitialTracks = async () => {
       const playlistId = new URLSearchParams(location.search).get('playlist');
-      const endpoint = playlistId === 'liked' 
-        ? 'https://api.spotify.com/v1/me/tracks?limit=50'
-        : `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`;
       
       try {
-        const response = await fetch(endpoint, {
-          headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
+        // Initialize API if not already done
+        if (!MusicStreamingAPI.isInitialized()) {
+          MusicStreamingAPI.initialize(accessToken, 'spotify');
+        }
         
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await MusicStreamingAPI.getPlaylistTracks(playlistId, 50, 0);
         
-        const data = await response.json();
         const trackList = data.items
           .map(item => item.track)
           .filter(track => track && !track.is_local);
@@ -893,10 +890,12 @@ const PlaylistSorter = ({ accessToken, user }) => {
     const fetchUserPlaylists = async () => {
       if (!location.state?.userPlaylists) {
         try {
-          const response = await fetch('https://api.spotify.com/v1/me/playlists', {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          });
-          const data = await response.json();
+          // Initialize API if not already done
+          if (!MusicStreamingAPI.isInitialized()) {
+            MusicStreamingAPI.initialize(accessToken, 'spotify');
+          }
+          
+          const data = await MusicStreamingAPI.getUserPlaylists(50, 0);
           const playlists = data.items;
           setUserPlaylists(playlists);
           setFilteredPlaylists(playlists);
@@ -1148,21 +1147,12 @@ const PlaylistSorter = ({ accessToken, user }) => {
 
   /**
    * Add a track to a playlist
-   * @param {string} playlistId - Spotify playlist ID
-   * @param {string} trackId - Spotify track ID
+   * @param {string} playlistId - Playlist ID
+   * @param {string} trackId - Track ID
    */
   const addTrackToPlaylist = async (playlistId, trackId) => {
     try {
-      await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          uris: [`spotify:track:${trackId}`]
-        })
-      });
+      await MusicStreamingAPI.addTrackToPlaylist(playlistId, trackId);
     } catch (error) {
       console.error('Error adding track to playlist:', error);
       throw error;
@@ -1171,23 +1161,12 @@ const PlaylistSorter = ({ accessToken, user }) => {
 
   /**
    * Remove a track from a playlist
-   * @param {string} playlistId - Spotify playlist ID
-   * @param {string} trackId - Spotify track ID
+   * @param {string} playlistId - Playlist ID
+   * @param {string} trackId - Track ID
    */
   const removeTrackFromPlaylist = async (playlistId, trackId) => {
     try {
-      await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          tracks: [{
-            uri: `spotify:track:${trackId}`
-          }]
-        })
-      });
+      await MusicStreamingAPI.removeTrackFromPlaylist(playlistId, trackId);
     } catch (error) {
       console.error('Error removing track from playlist:', error);
       throw error;
@@ -1335,19 +1314,19 @@ const PlaylistSorter = ({ accessToken, user }) => {
     
     setIsLoadingMore(true);
     try {
-      const response = await fetch(nextTracksUrl, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
+      // Parse the next URL to get offset and limit
+      const url = new URL(nextTracksUrl);
+      const playlistId = new URLSearchParams(location.search).get('playlist');
+      const offset = url.searchParams.get('offset') || 0;
+      const limit = url.searchParams.get('limit') || 50;
       
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await MusicStreamingAPI.getPlaylistTracks(playlistId, limit, offset);
       
-      const data = await response.json();
       const newTracks = data.items
         .map(item => item.track)
         .filter(track => track && !track.is_local);
       
       // Update cache for current playlist with new track IDs
-      const playlistId = new URLSearchParams(location.search).get('playlist');
       const currentId = playlistId === 'liked' ? 'liked' : playlistId;
       
       if (playlistTracksCache.current[currentId]) {
@@ -1404,24 +1383,12 @@ const PlaylistSorter = ({ accessToken, user }) => {
         throw new Error('User data not available');
       }
       
-      const createResponse = await fetch(`https://api.spotify.com/v1/users/${userData.id}/playlists`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: name,
-          public: false,
-          description: 'Created by Playlist Sorter'
-        })
-      });
-      
-      if (!createResponse.ok) {
-        throw new Error('Failed to create playlist');
-      }
-      
-      const newPlaylist = await createResponse.json();
+      const newPlaylist = await MusicStreamingAPI.createPlaylist(
+        userData.id,
+        name,
+        'Created by Playlist Sorter',
+        false
+      );
       
       // Initialize empty track set in both caches
       const emptySet = new Set();
@@ -1464,7 +1431,7 @@ const PlaylistSorter = ({ accessToken, user }) => {
   /**
    * Fetch ALL tracks from a playlist (handles pagination)
    * Caches track IDs in both ref (sync) and state (reactive) for reliability
-   * @param {string} playlistId - The Spotify playlist ID
+   * @param {string} playlistId - The playlist ID
    * @param {boolean} forceRefetch - Force refetch even if cached
    * @returns {Promise<Set>} Set of all track IDs in the playlist
    */
@@ -1496,73 +1463,10 @@ const PlaylistSorter = ({ accessToken, user }) => {
     // Create a promise for this fetch and store it
     const fetchPromise = (async () => {
       try {
-        let allTrackIds = new Set();
-        let trackDetails = [];
-        let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50&fields=items(track(external_urls.spotify)),next,total`;
-        let pageCount = 0;
-        let currentTotal = 0;
-        const MAX_PAGES = 200;
+        // Use the adapter's getAllPlaylistTracks method
+        const allTrackIds = await MusicStreamingAPI.getAllPlaylistTracks(playlistId);
         
-        /**
-         * Extracts track ID from Spotify URL
-         * Format: https://open.spotify.com/track/{track_id}
-         * @param {string} spotifyUrl - The Spotify track URL
-         * @returns {string|null} - The track ID or null if invalid
-         */
-        const extractTrackIdFromUrl = (spotifyUrl) => {
-          if (!spotifyUrl) return null;
-          const match = spotifyUrl.match(/track\/([a-zA-Z0-9]+)/);
-          return match ? match[1] : null;
-        };
-        
-        // Fetch all pages of tracks
-        while (nextUrl && pageCount < MAX_PAGES) {
-          pageCount++;
-          
-          const response = await fetch(nextUrl, {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`
-            }
-          });
-          
-          if (!response.ok) {
-            console.error(`HTTP error on page ${pageCount}! status: ${response.status}`);
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          currentTotal = data.total;
-          
-          // Add track IDs from this page
-          data.items.forEach(item => {
-            if (item.track?.external_urls?.spotify) {
-              const trackId = extractTrackIdFromUrl(item.track.external_urls.spotify);
-              if (trackId) {
-                allTrackIds.add(trackId);
-                trackDetails.push({
-                  id: trackId,
-                  url: item.track.external_urls.spotify
-                });
-              }
-            }
-          });
-          
-          console.log(`Page ${pageCount}: ${allTrackIds.size}/${currentTotal} tracks loaded`);
-          
-          // Use Spotify's next URL
-          nextUrl = data.next;
-          
-          if (nextUrl) {
-            // Add small delay to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-        }
-        
-        if (pageCount >= MAX_PAGES && nextUrl) {
-          console.warn(`Hit maximum page limit (${MAX_PAGES}) for playlist. Some tracks may not be fetched.`);
-        }
-        
-        console.log(`Loaded ${allTrackIds.size} tracks from ${pageCount} pages for playlist ${playlistId}`);
+        console.log(`Loaded ${allTrackIds.size} tracks for playlist ${playlistId}`);
         
         // Cache in ref (synchronous)
         playlistTracksCache.current[playlistId] = allTrackIds;
@@ -1676,17 +1580,7 @@ const PlaylistSorter = ({ accessToken, user }) => {
       if (!currentTrack) return;
       
       try {
-        const artistResponse = await fetch(
-          `https://api.spotify.com/v1/artists/${currentTrack.artists[0].id}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          }
-        );
-
-        if (!artistResponse.ok) {
-          throw new Error('Failed to fetch artist data');
-        }
-
-        const artist = await artistResponse.json();
+        const artist = await MusicStreamingAPI.getArtistData(currentTrack.artists[0].id);
         setArtistData(artist);
         setTrackMetadata({});
       } catch (error) {

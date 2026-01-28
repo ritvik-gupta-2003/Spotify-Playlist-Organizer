@@ -8,6 +8,7 @@ import MainPage from './components/MainPage';
 import PlaylistSorter from './components/PlaylistSorter';
 import SettingsPage from './components/SettingsPage';
 import CallbackPage from './components/CallbackPage';
+import MusicStreamingAPI from './services/MusicStreamingAPI';
 
 /**
  * Root application component
@@ -25,15 +26,11 @@ const App = () => {
       if (!token || user) return;
 
       try {
-        const response = await fetch('https://api.spotify.com/v1/me', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
+        // Initialize MusicStreamingAPI with access token
+        MusicStreamingAPI.initialize(token, 'spotify');
         
-        if (!response.ok) throw new Error('Failed to fetch user data');
-        
-        const userData = await response.json();
+        // Fetch user data via API
+        const userData = await MusicStreamingAPI.getUserData();
         setUser(userData);
       } catch (error) {
         console.error('Error fetching user data:', error);
@@ -53,6 +50,10 @@ const App = () => {
       setRefreshToken(refresh);
       localStorage.setItem('spotify_access_token', token);
       localStorage.setItem('spotify_refresh_token', refresh);
+      
+      // Initialize MusicStreamingAPI with the new token
+      MusicStreamingAPI.initialize(token, 'spotify');
+      
       history.push('/main');
     }
   }, [history]);
