@@ -6,7 +6,53 @@ import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 import PlaylistSelector from './PlaylistSelector';
+import EmptyPlaylistPopup from './popups/EmptyPlaylistPopup';
+import ProfileButton from './ui/ProfileButton';
 import LikedSongsIcon from '../images/LikedSongsIcon.png';
+
+/**
+ * Background layer for blurred profile picture
+ */
+const BackgroundLayer = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: ${props => props.src ? `url(${props.src})` : 'none'};
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(20px);
+  transform: scale(1.1);
+  opacity: ${props => props.visible ? 1 : 0};
+  transition: opacity 1s ease-in-out;
+  z-index: 0;
+  pointer-events: none;
+`;
+
+/**
+ * Dark overlay for better text readability
+ */
+const BackgroundOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.7) 100%);
+  z-index: 1;
+  pointer-events: none;
+`;
+
+/**
+ * Page container with content above background
+ */
+const PageContainer = styled.div`
+  min-height: 100vh;
+  position: relative;
+  z-index: 2;
+`;
 
 const MainContainer = styled.div`
   padding: 40px 20px;
@@ -82,53 +128,6 @@ const CloseButton = styled.button`
   }
 `;
 
-const PopupOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-`;
-
-const PopupContent = styled.div`
-  background: var(--surface-color);
-  padding: 24px;
-  border-radius: 8px;
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-`;
-
-const PopupButton = styled.button`
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 20px;
-  cursor: pointer;
-  margin-top: 16px;
-  font-weight: bold;
-
-  &:hover {
-    transform: scale(1.05);
-  }
-`;
-
-const EmptyPlaylistPopup = ({ onClose }) => (
-  <PopupOverlay>
-    <PopupContent>
-      <h3>Empty Playlist</h3>
-      <p>Sorry, please select a playlist with at least one track.</p>
-      <PopupButton onClick={onClose}>OK</PopupButton>
-    </PopupContent>
-  </PopupOverlay>
-);
-
 const CreateButton = styled.button`
   background-color: var(--primary-color);
   color: white;
@@ -162,46 +161,6 @@ const InputWrapper = styled.div`
   display: inline-block;
 `;
 
-const DefaultAvatar = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  &::after {
-    content: '';
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background-color: var(--primary-color);
-  }
-`;
-
-const ProfileButton = styled.button`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  padding: 0;
-  border: none;
-  cursor: pointer;
-  overflow: hidden;
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
-  backface-visibility: hidden;
-
-  &:hover {
-    transform: scale3d(1.1, 1.1, 1);
-  }
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-`;
 
 /**
  * Main page showing all user playlists
@@ -217,7 +176,28 @@ const MainPage = ({ accessToken, user }) => {
   const [showEmptyPlaylistPopup, setShowEmptyPlaylistPopup] = useState(false);
   const [likedSongsCount, setLikedSongsCount] = useState(0);
   const [localUser, setLocalUser] = useState(user);
+  const [backgroundLoaded, setBackgroundLoaded] = useState(false);
   const history = useHistory();
+
+  /**
+   * Preload and display profile picture background
+   */
+  useEffect(() => {
+    const profileImageUrl = localUser?.images?.[0]?.url;
+    if (!profileImageUrl) {
+      setBackgroundLoaded(false);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      setBackgroundLoaded(true);
+    };
+    img.onerror = () => {
+      setBackgroundLoaded(false);
+    };
+    img.src = profileImageUrl;
+  }, [localUser]);
 
   useEffect(() => {
     /**
@@ -376,20 +356,30 @@ const MainPage = ({ accessToken, user }) => {
 
   if (isLoading) {
     return (
-      <MainContainer>
-        <Header>
-          <h1>Your Playlists</h1>
-        </Header>
-        <div>Loading all playlists...</div>
-      </MainContainer>
+      <>
+        <BackgroundLayer src={localUser?.images?.[0]?.url} visible={backgroundLoaded} />
+        <BackgroundOverlay />
+        <PageContainer>
+          <MainContainer>
+            <Header>
+              <h1>Your Playlists</h1>
+            </Header>
+            <div>Loading all playlists...</div>
+          </MainContainer>
+        </PageContainer>
+      </>
     );
   }
 
   return (
-    <MainContainer>
+    <>
+      <BackgroundLayer src={localUser?.images?.[0]?.url} visible={backgroundLoaded} />
+      <BackgroundOverlay />
+      <PageContainer>
+        <MainContainer>
       <Header>
         <HeaderTitle>
-          <h1>Your Playlists!</h1>
+          <h1>Your Playlists</h1>
           <Subtitle>Select a playlist to organize</Subtitle>
         </HeaderTitle>
         <HeaderContent>
@@ -435,21 +425,10 @@ const MainPage = ({ accessToken, user }) => {
               Create New Playlist
             </CreateButton>
           )}
-          <ProfileButton onClick={() => history.push('/settings', { user: localUser })}>
-            {localUser && localUser.images && localUser.images[0] && localUser.images[0].url ? (
-              <img 
-                src={localUser.images[0].url} 
-                alt="Profile"
-                onError={(e) => {
-                  console.error('Profile image failed to load');
-                  e.target.style.display = 'none';
-                  e.target.parentElement.appendChild(document.createElement('div')).className = 'default-avatar';
-                }}
-              />
-            ) : (
-              <DefaultAvatar />
-            )}
-          </ProfileButton>
+          <ProfileButton 
+            user={localUser}
+            onClick={() => history.push('/settings', { user: localUser })}
+          />
         </HeaderContent>
       </Header>
 
@@ -471,6 +450,8 @@ const MainPage = ({ accessToken, user }) => {
         <EmptyPlaylistPopup onClose={() => setShowEmptyPlaylistPopup(false)} />
       )}
     </MainContainer>
+      </PageContainer>
+    </>
   );
 };
 

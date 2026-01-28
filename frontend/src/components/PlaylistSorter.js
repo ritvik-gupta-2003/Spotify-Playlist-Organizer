@@ -6,6 +6,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useHistory } from 'react-router-dom';
 import styled, { createGlobalStyle } from 'styled-components';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
+import UnsavedChangesPopup from './popups/UnsavedChangesPopup';
+import DiscardChangesPopup from './popups/DiscardChangesPopup';
+import LocalFileError from './popups/LocalFileErrorPopup';
+import LoadingOverlay from './ui/LoadingOverlay';
 
 const BackButton = styled.button`
   position: absolute;
@@ -620,52 +624,6 @@ const SelectionOption = styled.button`
   }
 `;
 
-const LoadingOverlay = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-`;
-
-const GlobalLoadingOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  gap: 20px;
-`;
-
-const LoadingSpinner = styled.div`
-  width: 50px;
-  height: 50px;
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-top: 4px solid #1DB954;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  will-change: transform;
-  backface-visibility: hidden;
-`;
-
-const LoadingText = styled.div`
-  color: white;
-  font-size: 18px;
-  font-weight: 600;
-  text-align: center;
-  max-width: 80%;
-`;
 
 const TrackNumberInput = styled.input`
   background: none;
@@ -732,143 +690,11 @@ const BackgroundOverlay = styled.div`
   pointer-events: none;
 `;
 
-const PopupOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-`;
 
-const PopupContent = styled.div`
-  background: var(--surface-color);
-  padding: 24px;
-  border-radius: 8px;
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-`;
-
-const PopupButtons = styled.div`
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-top: 20px;
-`;
-
-const UnsavedChangesPopup = ({ onSave, onDiscard, onCancel }) => (
-  <PopupOverlay>
-    <PopupContent>
-      <h3>Unsaved Changes</h3>
-      <p>You have unsaved changes. What would you like to do?</p>
-      <PopupButtons>
-        <Button onClick={onSave}>Save Changes</Button>
-        <Button onClick={onDiscard}>Discard Changes</Button>
-        <Button onClick={onCancel}>Cancel</Button>
-      </PopupButtons>
-    </PopupContent>
-  </PopupOverlay>
-);
-
-const DiscardChangesPopup = ({ onClose }) => (
-  <PopupOverlay>
-    <PopupContent>
-      <h3>Changes Discarded</h3>
-      <p>All changes have been discarded.</p>
-      <PopupButtons>
-        <Button onClick={onClose}>OK</Button>
-      </PopupButtons>
-    </PopupContent>
-  </PopupOverlay>
-);
-
-const HeaderContent = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-left: auto;
-`;
-
-const ProfileButton = styled.button`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  padding: 0;
-  border: none;
-  cursor: pointer;
-  overflow: hidden;
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
-  backface-visibility: hidden;
-  position: absolute;
-  top: 20px;
-  right: 20px;
-
-  &:hover {
-    transform: scale3d(1.1, 1.1, 1);
-  }
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-`;
-
-const DefaultAvatar = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  &::after {
-    content: '';
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background-color: var(--primary-color);
-  }
-`;
-
-const LocalFileErrorPopup = styled(PopupContent)`
-  background: var(--surface-color);
-  max-width: 300px;
-  padding: 20px;
-`;
-
-const LocalFileError = ({ onPrevious, onNext, hasNextTrack }) => (
-  <PopupOverlay>
-    <LocalFileErrorPopup>
-      <h3>Sorry, Local Files Not Allowed</h3>
-      <p>This track cannot be processed as it is a local file.</p>
-      <PopupButtons>
-        <Button onClick={onPrevious}>Previous</Button>
-        {hasNextTrack && <Button onClick={onNext}>Next</Button>}
-      </PopupButtons>
-    </LocalFileErrorPopup>
-  </PopupOverlay>
-);
 
 const GlobalStyle = createGlobalStyle`
   body {
     overflow: hidden;
-  }
-  
-  @keyframes spin {
-    0% {
-      transform: rotate3d(0, 0, 1, 0deg);
-    }
-    100% {
-      transform: rotate3d(0, 0, 1, 360deg);
-    }
   }
   
   @keyframes trackSlideNext {
@@ -1875,10 +1701,7 @@ const PlaylistSorter = ({ accessToken, user }) => {
     return (
       <>
         <GlobalStyle />
-        <GlobalLoadingOverlay>
-          <LoadingSpinner />
-          <LoadingText>Loading playlist...</LoadingText>
-        </GlobalLoadingOverlay>
+        <LoadingOverlay message="Loading playlist..." />
       </>
     );
   }
@@ -2167,10 +1990,7 @@ const PlaylistSorter = ({ accessToken, user }) => {
       </PageContainer>
       
       {isLoadingPlaylistData && (
-        <GlobalLoadingOverlay>
-          <LoadingSpinner />
-          <LoadingText>{loadingMessage || 'Loading playlist data...'}</LoadingText>
-        </GlobalLoadingOverlay>
+        <LoadingOverlay message={loadingMessage || 'Loading playlist data...'} />
       )}
     </>
   );

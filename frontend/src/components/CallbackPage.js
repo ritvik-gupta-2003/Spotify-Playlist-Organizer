@@ -4,6 +4,7 @@
  */
 import React, { useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
+import LoadingOverlay from './ui/LoadingOverlay';
 import { API_URL } from '../config';
 
 /**
@@ -47,7 +48,7 @@ const CallbackPage = () => {
     handleCallback();
   }, [history]);
 
-  return <div>Loading...</div>;
+  return <LoadingOverlay message="Authenticating with Spotify..." />;
 };
 
 export default CallbackPage; 
