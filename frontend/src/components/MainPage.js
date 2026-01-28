@@ -1,8 +1,58 @@
+/**
+ * MainPage component displays user's playlists and allows playlist selection
+ * Includes search, create playlist, and profile features
+ */
 import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 import PlaylistSelector from './PlaylistSelector';
+import EmptyPlaylistPopup from './popups/EmptyPlaylistPopup';
+import ProfileButton from './ui/ProfileButton';
 import LikedSongsIcon from '../images/LikedSongsIcon.png';
+
+/**
+ * Background layer for blurred profile picture
+ */
+const BackgroundLayer = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: ${props => props.src ? `url(${props.src})` : 'none'};
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(20px);
+  transform: scale(1.1);
+  opacity: ${props => props.visible ? 1 : 0};
+  transition: opacity 1s ease-in-out;
+  z-index: 0;
+  pointer-events: none;
+`;
+
+/**
+ * Dark overlay for better text readability
+ */
+const BackgroundOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.7) 100%);
+  z-index: 1;
+  pointer-events: none;
+`;
+
+/**
+ * Page container with content above background
+ */
+const PageContainer = styled.div`
+  min-height: 100vh;
+  position: relative;
+  z-index: 2;
+`;
 
 const MainContainer = styled.div`
   padding: 40px 20px;
@@ -47,48 +97,18 @@ const SearchInput = styled.input`
   color: var(--text-primary);
   width: 300px;
   font-size: 16px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
 
   &:focus {
     outline: none;
     box-shadow: 0 0 0 2px var(--primary-color);
-    transform: scale(1.02);
+    transform: scale3d(1.02, 1.02, 1);
   }
 
   &::placeholder {
     color: var(--text-secondary);
-  }
-`;
-
-const CreatePlaylistBox = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--surface-color);
-  border-radius: 8px;
-  padding: 20px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  height: 100%;
-
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
-`;
-
-const PlaylistInput = styled.input`
-  width: 100%;
-  padding: 12px;
-  background-color: #1a1a1a;
-  border: none;
-  border-radius: 4px;
-  color: var(--text-primary);
-  margin-top: 10px;
-  
-  &:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px var(--primary-color);
   }
 `;
 
@@ -108,53 +128,6 @@ const CloseButton = styled.button`
   }
 `;
 
-const PopupOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-`;
-
-const PopupContent = styled.div`
-  background: var(--surface-color);
-  padding: 24px;
-  border-radius: 8px;
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-`;
-
-const PopupButton = styled.button`
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 20px;
-  cursor: pointer;
-  margin-top: 16px;
-  font-weight: bold;
-
-  &:hover {
-    transform: scale(1.05);
-  }
-`;
-
-const EmptyPlaylistPopup = ({ onClose }) => (
-  <PopupOverlay>
-    <PopupContent>
-      <h3>Empty Playlist</h3>
-      <p>Sorry, please select a playlist with at least one track.</p>
-      <PopupButton onClick={onClose}>OK</PopupButton>
-    </PopupContent>
-  </PopupOverlay>
-);
-
 const CreateButton = styled.button`
   background-color: var(--primary-color);
   color: white;
@@ -166,11 +139,13 @@ const CreateButton = styled.button`
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
   box-shadow: 0 2px 8px rgba(29, 185, 84, 0.2);
 
   &:hover {
-    transform: scale(1.05);
+    transform: scale3d(1.05, 1.05, 1);
     box-shadow: 0 4px 12px rgba(29, 185, 84, 0.4);
   }
 `;
@@ -186,45 +161,12 @@ const InputWrapper = styled.div`
   display: inline-block;
 `;
 
-const DefaultAvatar = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  &::after {
-    content: '';
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background-color: var(--primary-color);
-  }
-`;
 
-const ProfileButton = styled.button`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  padding: 0;
-  border: none;
-  cursor: pointer;
-  overflow: hidden;
-  transition: transform 0.2s ease;
-
-  &:hover {
-    transform: scale(1.1);
-  }
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-`;
-
+/**
+ * Main page showing all user playlists
+ * @param {string} accessToken - Spotify access token
+ * @param {Object} user - User data from Spotify
+ */
 const MainPage = ({ accessToken, user }) => {
   const [playlists, setPlaylists] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -234,31 +176,54 @@ const MainPage = ({ accessToken, user }) => {
   const [showEmptyPlaylistPopup, setShowEmptyPlaylistPopup] = useState(false);
   const [likedSongsCount, setLikedSongsCount] = useState(0);
   const [localUser, setLocalUser] = useState(user);
+  const [backgroundLoaded, setBackgroundLoaded] = useState(false);
   const history = useHistory();
 
+  /**
+   * Preload and display profile picture background
+   */
   useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const response = await fetch('https://api.spotify.com/v1/me', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          }
-        });
+    const profileImageUrl = localUser?.images?.[0]?.url;
+    if (!profileImageUrl) {
+      setBackgroundLoaded(false);
+      return;
+    }
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const userData = await response.json();
-        setLocalUser(userData);
-      } catch (error) {
-        console.error('User data fetch error:', error);
+    const img = new Image();
+    img.onload = () => {
+      setBackgroundLoaded(true);
+    };
+    img.onerror = () => {
+      setBackgroundLoaded(false);
+    };
+    img.src = profileImageUrl;
+  }, [localUser]);
+
+  useEffect(() => {
+    /**
+     * Fetch user data if not already provided
+     */
+    const fetchUserData = async () => {
+      if (!localUser && accessToken) {
+        try {
+          const response = await fetch('https://api.spotify.com/v1/me', {
+            headers: {
+              Authorization: `Bearer ${accessToken}`
+            }
+          });
+
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const userData = await response.json();
+          setLocalUser(userData);
+        } catch (error) {
+          console.error('User data fetch error:', error);
+        }
       }
     };
 
-    if (!localUser && accessToken) {
-      fetchUserData();
-    }
-  }, [accessToken, localUser]);
-
-  useEffect(() => {
+    /**
+     * Fetch total count of liked songs
+     */
     const fetchLikedSongs = async () => {
       try {
         const response = await fetch('https://api.spotify.com/v1/me/tracks?limit=1', {
@@ -320,11 +285,16 @@ const MainPage = ({ accessToken, user }) => {
     };
 
     if (accessToken) {
+      fetchUserData();
       fetchLikedSongs();
       fetchAllPlaylists();
     }
-  }, [accessToken]);
+  }, [accessToken, localUser]);
 
+  /**
+   * Handle playlist selection and navigate to sort page
+   * @param {string} playlistId - ID of the selected playlist
+   */
   const handlePlaylistSelect = (playlistId) => {
     const selectedPlaylist = playlists.find(p => p.id === playlistId);
     
@@ -340,27 +310,26 @@ const MainPage = ({ accessToken, user }) => {
     });
   };
 
-  const filteredPlaylists = playlists
-    .filter(playlist => 
-      playlist.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      playlist.name !== 'DJ'
-    );
+  /**
+   * Filter playlists based on search query
+   */
+  const filteredPlaylists = playlists.filter(playlist => 
+    playlist.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    playlist.name !== 'DJ'
+  );
 
+  /**
+   * Create a new playlist for the current user
+   * @param {string} name - Name of the playlist to create
+   * @returns {Object|null} The newly created playlist or null on error
+   */
   const createNewPlaylist = async (name) => {
     try {
-      const userResponse = await fetch('https://api.spotify.com/v1/me', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-      
-      if (!userResponse.ok) {
-        throw new Error('Failed to fetch user data');
+      if (!localUser?.id) {
+        throw new Error('User data not available');
       }
       
-      const userData = await userResponse.json();
-      
-      const createResponse = await fetch(`https://api.spotify.com/v1/users/${userData.id}/playlists`, {
+      const createResponse = await fetch(`https://api.spotify.com/v1/users/${localUser.id}/playlists`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -387,17 +356,27 @@ const MainPage = ({ accessToken, user }) => {
 
   if (isLoading) {
     return (
-      <MainContainer>
-        <Header>
-          <h1>Your Playlists</h1>
-        </Header>
-        <div>Loading all playlists...</div>
-      </MainContainer>
+      <>
+        <BackgroundLayer src={localUser?.images?.[0]?.url} visible={backgroundLoaded} />
+        <BackgroundOverlay />
+        <PageContainer>
+          <MainContainer>
+            <Header>
+              <h1>Your Playlists</h1>
+            </Header>
+            <div>Loading all playlists...</div>
+          </MainContainer>
+        </PageContainer>
+      </>
     );
   }
 
   return (
-    <MainContainer>
+    <>
+      <BackgroundLayer src={localUser?.images?.[0]?.url} visible={backgroundLoaded} />
+      <BackgroundOverlay />
+      <PageContainer>
+        <MainContainer>
       <Header>
         <HeaderTitle>
           <h1>Your Playlists</h1>
@@ -446,21 +425,10 @@ const MainPage = ({ accessToken, user }) => {
               Create New Playlist
             </CreateButton>
           )}
-          <ProfileButton onClick={() => history.push('/settings', { user: localUser })}>
-            {localUser && localUser.images && localUser.images[0] && localUser.images[0].url ? (
-              <img 
-                src={localUser.images[0].url} 
-                alt="Profile"
-                onError={(e) => {
-                  console.error('Profile image failed to load');
-                  e.target.style.display = 'none';
-                  e.target.parentElement.appendChild(document.createElement('div')).className = 'default-avatar';
-                }}
-              />
-            ) : (
-              <DefaultAvatar />
-            )}
-          </ProfileButton>
+          <ProfileButton 
+            user={localUser}
+            onClick={() => history.push('/settings', { user: localUser })}
+          />
         </HeaderContent>
       </Header>
 
@@ -482,6 +450,8 @@ const MainPage = ({ accessToken, user }) => {
         <EmptyPlaylistPopup onClose={() => setShowEmptyPlaylistPopup(false)} />
       )}
     </MainContainer>
+      </PageContainer>
+    </>
   );
 };
 

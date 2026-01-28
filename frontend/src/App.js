@@ -1,3 +1,6 @@
+/**
+ * Main App component - handles routing and authentication state
+ */
 import React, { useState, useEffect } from 'react';
 import { Switch, Route, useHistory } from 'react-router-dom';
 import LoginPage from './components/LoginPage';
@@ -6,6 +9,10 @@ import PlaylistSorter from './components/PlaylistSorter';
 import SettingsPage from './components/SettingsPage';
 import CallbackPage from './components/CallbackPage';
 
+/**
+ * Root application component
+ * Manages authentication state and routing
+ */
 const App = () => {
   const [accessToken, setAccessToken] = useState(null);
   const [refreshToken, setRefreshToken] = useState(null);
@@ -34,7 +41,7 @@ const App = () => {
     };
 
     fetchUserData();
-  }, [accessToken]);
+  }, [accessToken, user]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -50,6 +57,10 @@ const App = () => {
     }
   }, [history]);
 
+  /**
+   * Handle user logout
+   * Clears authentication state and redirects to login
+   */
   const handleLogout = () => {
     setAccessToken(null);
     setRefreshToken(null);

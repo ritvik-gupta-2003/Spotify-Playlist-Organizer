@@ -17,6 +17,8 @@ body {
   background-color: var(--background-color);
   color: var(--text-primary);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Typography improvements */
@@ -42,46 +44,46 @@ h3 {
 
 /* Card animation utilities */
 .card-slide-in {
-  animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: slideIn 0.3s ease-out forwards;
 }
 
 .card-slide-out-left {
-  animation: slideOutLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: slideOutLeft 0.3s ease-out forwards;
 }
 
 .card-slide-out-right {
-  animation: slideOutRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: slideOutRight 0.3s ease-out forwards;
 }
 
 @keyframes slideIn {
   from {
-    transform: translateX(100%) scale(0.95);
+    transform: translateX(20px);
     opacity: 0;
   }
   to {
-    transform: translateX(0) scale(1);
+    transform: translateX(0);
     opacity: 1;
   }
 }
 
 @keyframes slideOutLeft {
   from {
-    transform: translateX(0) scale(1);
+    transform: translateX(0);
     opacity: 1;
   }
   to {
-    transform: translateX(-100%) scale(0.95);
+    transform: translateX(-20px);
     opacity: 0;
   }
 }
 
 @keyframes slideOutRight {
   from {
-    transform: translateX(0) scale(1);
+    transform: translateX(0);
     opacity: 1;
   }
   to {
-    transform: translateX(100%) scale(0.95);
+    transform: translateX(20px);
     opacity: 0;
   }
 }

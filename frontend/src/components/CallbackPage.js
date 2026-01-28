@@ -1,7 +1,16 @@
+/**
+ * CallbackPage component handles Spotify OAuth callback
+ * Exchanges authorization code for access tokens
+ */
 import React, { useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
+import LoadingOverlay from './ui/LoadingOverlay';
 import { API_URL } from '../config';
 
+/**
+ * Callback page for Spotify OAuth flow
+ * Handles the redirect from Spotify authorization
+ */
 const CallbackPage = () => {
   const history = useHistory();
 
@@ -39,7 +48,7 @@ const CallbackPage = () => {
     handleCallback();
   }, [history]);
 
-  return <div>Loading...</div>;
+  return <LoadingOverlay message="Authenticating with Spotify..." />;
 };
 
 export default CallbackPage; 

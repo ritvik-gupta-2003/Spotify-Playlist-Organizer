@@ -1,9 +1,15 @@
+/**
+ * PlaylistSorter component - main interface for organizing tracks into playlists
+ * Displays track information and allows quick sorting into multiple playlists
+ */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useHistory } from 'react-router-dom';
 import styled, { createGlobalStyle } from 'styled-components';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
-
-const SHOW_AUDIO_FEATURES = false;
+import UnsavedChangesPopup from './popups/UnsavedChangesPopup';
+import DiscardChangesPopup from './popups/DiscardChangesPopup';
+import LocalFileError from './popups/LocalFileErrorPopup';
+import LoadingOverlay from './ui/LoadingOverlay';
 
 const BackButton = styled.button`
   position: absolute;
@@ -72,10 +78,12 @@ const Section = styled.div`
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
   
   &:hover {
-    transform: translateY(-2px);
+    transform: translate3d(0, -2px, 0);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
   }
   
@@ -203,33 +211,31 @@ const GenreItem = styled.span`
 const MetadataSection = styled(Section)`
   display: flex;
   flex-direction: column;
-  ${!SHOW_AUDIO_FEATURES && `
-    justify-content: center;
-    align-items: center;
-    font-size: 1.4rem;
-    
-    ${MetadataItem} {
-      margin: 15px 0;
-    }
-    
-    ${MetadataLabel} {
-      font-size: 1.6rem;
-    }
-    
-    ${MetadataValue} {
-      font-size: 1.6rem;
-    }
-    
-    ${GenreList} {
-      font-size: 1.4rem;
-    }
-    
-    ${GenreItem} {
-      font-size: 1.4rem;
-      margin: 5px 0;
-    }
-  `}
+  justify-content: center;
+  align-items: center;
+  font-size: 1.4rem;
   gap: 15px;
+  
+  ${MetadataItem} {
+    margin: 15px 0;
+  }
+  
+  ${MetadataLabel} {
+    font-size: 1.6rem;
+  }
+  
+  ${MetadataValue} {
+    font-size: 1.6rem;
+  }
+  
+  ${GenreList} {
+    font-size: 1.4rem;
+  }
+  
+  ${GenreItem} {
+    font-size: 1.4rem;
+    margin: 5px 0;
+  }
 `;
 
 /**
@@ -267,7 +273,8 @@ const PlaylistCheckbox = styled.div`
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: background-color;
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.1);
@@ -299,7 +306,9 @@ const Button = styled.button`
   font-size: ${props => props.variant === 'nav' ? '1.1rem' : '1rem'};
   opacity: ${props => props.disabled ? 0.5 : 1};
   pointer-events: ${props => props.disabled ? 'none' : 'auto'};
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
   box-shadow: ${props => props.variant === 'nav' 
     ? '0 4px 16px rgba(29, 185, 84, 0.3)' 
     : props.variant === 'secondary' 
@@ -307,7 +316,7 @@ const Button = styled.button`
     : '0 2px 8px rgba(29, 185, 84, 0.2)'};
 
   &:hover {
-    transform: ${props => props.disabled ? 'none' : 'scale(1.08)'};
+    transform: ${props => props.disabled ? 'none' : 'scale3d(1.08, 1.08, 1)'};
     box-shadow: ${props => props.variant === 'nav' 
       ? '0 6px 20px rgba(29, 185, 84, 0.5)' 
       : props.variant === 'secondary' 
@@ -316,7 +325,7 @@ const Button = styled.button`
   }
   
   &:active {
-    transform: ${props => props.disabled ? 'none' : 'scale(1.02)'};
+    transform: ${props => props.disabled ? 'none' : 'scale3d(1.02, 1.02, 1)'};
   }
   
   @media (max-width: 768px) {
@@ -362,7 +371,9 @@ const PlaylistBox = styled.div`
     return props.isSelected ? 'rgba(29, 185, 84, 0.8)' : 'rgba(233, 20, 41, 0.8)';
   }};
   cursor: ${props => !props.isEmpty ? 'pointer' : 'default'};
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
   box-shadow: ${props => props.isEmpty 
     ? '0 2px 8px rgba(0, 0, 0, 0.2)' 
     : props.isSelected 
@@ -373,7 +384,7 @@ const PlaylistBox = styled.div`
     background: ${props => props.isEmpty 
       ? 'rgba(35, 35, 35, 0.7)' 
       : 'rgba(50, 50, 50, 0.9)'};
-    transform: ${props => !props.isEmpty ? 'translateY(-1px)' : 'none'};
+    transform: ${props => !props.isEmpty ? 'translate3d(0, -1px, 0)' : 'none'};
     box-shadow: ${props => props.isEmpty 
       ? '0 3px 10px rgba(0, 0, 0, 0.25)' 
       : props.isSelected 
@@ -382,7 +393,7 @@ const PlaylistBox = styled.div`
   }
   
   &:active {
-    transform: ${props => !props.isEmpty ? 'scale(0.98)' : 'none'};
+    transform: ${props => !props.isEmpty ? 'scale3d(0.98, 0.98, 1)' : 'none'};
   }
 `;
 
@@ -419,7 +430,8 @@ const PlaylistInput = styled.input`
   border-radius: 8px;
   color: var(--text-primary);
   font-size: 0.95rem;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: border-color, background;
   
   &:focus {
     outline: none;
@@ -482,7 +494,9 @@ const PlaylistOption = styled.div`
   padding: 10px 14px;
   cursor: pointer;
   height: 56px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
   border-radius: 8px;
   margin: 4px 6px;
   
@@ -503,11 +517,11 @@ const PlaylistOption = styled.div`
   
   &:hover {
     background: rgba(29, 185, 84, 0.2);
-    transform: translateX(4px);
+    transform: translate3d(4px, 0, 0);
   }
   
   &:active {
-    transform: scale(0.98) translateX(4px);
+    transform: scale3d(0.98, 0.98, 1) translate3d(4px, 0, 0);
   }
 `;
 
@@ -530,19 +544,21 @@ const RemoveButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
   line-height: 1;
   
   &:hover {
     opacity: 1;
     background: rgba(233, 20, 41, 0.35);
     border-color: rgba(233, 20, 41, 0.9);
-    transform: scale(1.1);
+    transform: scale3d(1.1, 1.1, 1);
     color: #ffffff;
   }
   
   &:active {
-    transform: scale(0.95);
+    transform: scale3d(0.95, 0.95, 1);
   }
 `;
 
@@ -561,7 +577,9 @@ const ProgressBar = styled.div`
   width: ${props => (props.progress / props.total) * 100}%;
   height: 2px;
   background-color: var(--primary-color);
-  transition: width 0.3s ease;
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: width;
+  backface-visibility: hidden;
   z-index: 1000;
 `;
 
@@ -587,7 +605,9 @@ const SelectionOption = styled.button`
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -595,59 +615,15 @@ const SelectionOption = styled.button`
   &:hover {
     background: rgba(29, 185, 84, 0.2);
     border-color: rgba(29, 185, 84, 0.8);
-    transform: translateY(-1px);
+    transform: translate3d(0, -1px, 0);
     box-shadow: 0 3px 8px rgba(29, 185, 84, 0.25);
   }
   
   &:active {
-    transform: scale(0.98);
+    transform: scale3d(0.98, 0.98, 1);
   }
 `;
 
-const LoadingOverlay = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-`;
-
-const GlobalLoadingOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  gap: 20px;
-`;
-
-const LoadingSpinner = styled.div`
-  width: 50px;
-  height: 50px;
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-top: 4px solid #1DB954;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-`;
-
-const LoadingText = styled.div`
-  color: white;
-  font-size: 18px;
-  font-weight: 600;
-  text-align: center;
-  max-width: 80%;
-`;
 
 const TrackNumberInput = styled.input`
   background: none;
@@ -672,6 +648,27 @@ const TrackNumberInput = styled.input`
 `;
 
 /**
+ * Background layer for crossfading between album arts
+ */
+const BackgroundLayer = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: ${props => props.src ? `url(${props.src})` : 'none'};
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(20px);
+  transform: scale(1.1);
+  opacity: ${props => props.visible ? 1 : 0};
+  transition: opacity 0.6s ease-in-out;
+  z-index: 0;
+  pointer-events: none;
+`;
+
+/**
  * Main page container with dynamic background based on album cover
  * Creates a Spotify-style blurred album artwork background effect
  */
@@ -679,204 +676,55 @@ const PageContainer = styled.div`
   min-height: 100vh;
   position: relative;
   overflow: hidden;
-  background-color: #121212;
-  
-  &::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: ${props => props.albumArt ? `url(${props.albumArt})` : 'none'};
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    opacity: ${props => props.albumArt ? '1' : '0'};
-    z-index: 0;
-    transition: background-image 0.5s ease-in-out, opacity 0.5s ease-in-out;
-    filter: blur(20px);
-    transform: scale(1.1);
-  }
-  
-  &::after {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.4) 100%);
-    z-index: 0;
-    pointer-events: none;
-  }
-  
-  > * {
-    position: relative;
-    z-index: 1;
-  }
+  z-index: 2;
 `;
 
-const PopupOverlay = styled.div`
+const BackgroundOverlay = styled.div`
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.4) 100%);
+  z-index: 1;
+  pointer-events: none;
 `;
 
-const PopupContent = styled.div`
-  background: var(--surface-color);
-  padding: 24px;
-  border-radius: 8px;
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-`;
 
-const PopupButtons = styled.div`
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-top: 20px;
-`;
-
-const UnsavedChangesPopup = ({ onSave, onDiscard, onCancel }) => (
-  <PopupOverlay>
-    <PopupContent>
-      <h3>Unsaved Changes</h3>
-      <p>You have unsaved changes. What would you like to do?</p>
-      <PopupButtons>
-        <Button onClick={onSave}>Save Changes</Button>
-        <Button onClick={onDiscard}>Discard Changes</Button>
-        <Button onClick={onCancel}>Cancel</Button>
-      </PopupButtons>
-    </PopupContent>
-  </PopupOverlay>
-);
-
-const DiscardChangesPopup = ({ onClose }) => (
-  <PopupOverlay>
-    <PopupContent>
-      <h3>Changes Discarded</h3>
-      <p>All changes have been discarded.</p>
-      <PopupButtons>
-        <Button onClick={onClose}>OK</Button>
-      </PopupButtons>
-    </PopupContent>
-  </PopupOverlay>
-);
-
-const HeaderContent = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-left: auto;
-`;
-
-const ProfileButton = styled.button`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  padding: 0;
-  border: none;
-  cursor: pointer;
-  overflow: hidden;
-  transition: transform 0.2s ease;
-  position: absolute;
-  top: 20px;
-  right: 20px;
-
-  &:hover {
-    transform: scale(1.1);
-  }
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-`;
-
-const DefaultAvatar = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  &::after {
-    content: '';
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background-color: var(--primary-color);
-  }
-`;
-
-const LocalFileErrorPopup = styled(PopupContent)`
-  background: var(--surface-color);
-  max-width: 300px;
-  padding: 20px;
-`;
-
-const LocalFileError = ({ onPrevious, onNext, hasNextTrack }) => (
-  <PopupOverlay>
-    <LocalFileErrorPopup>
-      <h3>Sorry, Local Files Not Allowed</h3>
-      <p>This track cannot be processed as it is a local file.</p>
-      <PopupButtons>
-        <Button onClick={onPrevious}>Previous</Button>
-        {hasNextTrack && <Button onClick={onNext}>Next</Button>}
-      </PopupButtons>
-    </LocalFileErrorPopup>
-  </PopupOverlay>
-);
 
 const GlobalStyle = createGlobalStyle`
   body {
     overflow: hidden;
   }
   
-  @keyframes spin {
-    0% {
-      transform: rotate(0deg);
-    }
-    100% {
-      transform: rotate(360deg);
-    }
-  }
-  
   @keyframes trackSlideNext {
-    0% {
+    from {
       opacity: 0;
-      transform: translateX(50px);
+      transform: translateX(20px);
     }
-    100% {
+    to {
       opacity: 1;
       transform: translateX(0);
     }
   }
   
   @keyframes trackSlidePrev {
-    0% {
+    from {
       opacity: 0;
-      transform: translateX(-50px);
+      transform: translateX(-20px);
     }
-    100% {
+    to {
       opacity: 1;
       transform: translateX(0);
     }
   }
 `;
 
+/**
+ * Playlist sorter component for organizing tracks
+ * @param {string} accessToken - Spotify access token
+ * @param {Object} user - User data from Spotify
+ */
 const PlaylistSorter = ({ accessToken, user }) => {
   const location = useLocation();
   const history = useHistory();
@@ -907,16 +755,16 @@ const PlaylistSorter = ({ accessToken, user }) => {
   // Track ongoing fetch operations to prevent concurrent requests
   const ongoingFetches = useRef(new Map());
   const [jumpToTrack, setJumpToTrack] = useState('');
-  const [backgroundColors, setBackgroundColors] = useState(['#000', '#000', '#000', '#000', '#000']);
   const [showUnsavedPopup, setShowUnsavedPopup] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [selectedStates, setSelectedStates] = useState({});
   const [showDiscardPopup, setShowDiscardPopup] = useState(false);
   const [userData, setUserData] = useState(user);
   const [showLocalFileError, setShowLocalFileError] = useState(false);
-  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
-  const [audioFeaturesCache, setAudioFeaturesCache] = useState({});
   const [slideDirection, setSlideDirection] = useState(null);
+  const [currentBackground, setCurrentBackground] = useState(null);
+  const [previousBackground, setPreviousBackground] = useState(null);
+  const [backgroundLoaded, setBackgroundLoaded] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -943,10 +791,53 @@ const PlaylistSorter = ({ accessToken, user }) => {
     if (slideDirection) {
       const timer = setTimeout(() => {
         setSlideDirection(null);
-      }, 400);
+      }, 250);
       return () => clearTimeout(timer);
     }
   }, [slideDirection]);
+
+  /**
+   * Handle smooth background transitions when track changes
+   * Preloads new image before crossfading to prevent black flash
+   */
+  useEffect(() => {
+    const albumArtUrl = currentTrack?.album?.images?.[0]?.url;
+    if (!albumArtUrl) return;
+    
+    // If background hasn't changed, do nothing
+    if (albumArtUrl === currentBackground) return;
+    
+    // If this is the first track, set it immediately without fade
+    if (!currentBackground) {
+      setCurrentBackground(albumArtUrl);
+      setBackgroundLoaded(true);
+      return;
+    }
+    
+    // Preload the new image before transitioning
+    const img = new Image();
+    img.onload = () => {
+      // Move current to previous and hide new
+      setPreviousBackground(currentBackground);
+      setBackgroundLoaded(false);
+      
+      // Set new background
+      setCurrentBackground(albumArtUrl);
+      
+      // Trigger fade-in after a brief delay
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setBackgroundLoaded(true);
+        });
+      });
+    };
+    img.onerror = () => {
+      // If image fails to load, still update to avoid being stuck
+      setCurrentBackground(albumArtUrl);
+      setBackgroundLoaded(true);
+    };
+    img.src = albumArtUrl;
+  }, [currentTrack]);
 
   useEffect(() => {
     /**
@@ -971,30 +862,6 @@ const PlaylistSorter = ({ accessToken, user }) => {
           .map(item => item.track)
           .filter(track => track && !track.is_local);
         
-        if (SHOW_AUDIO_FEATURES) {
-          const trackIds = trackList.map(track => track.id).join(',');
-          try {
-            const audioResponse = await fetch(
-              `https://api.spotify.com/v1/audio-features?ids=${trackIds}`, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-              }
-            );
-
-            if (audioResponse.ok) {
-              const { audio_features } = await audioResponse.json();
-              const newCache = {};
-              audio_features.forEach((features, index) => {
-                if (features) {
-                  newCache[trackList[index].id] = features;
-                }
-              });
-              setAudioFeaturesCache(prev => ({...prev, ...newCache}));
-            }
-          } catch (error) {
-            console.error('Error fetching audio features:', error);
-          }
-        }
-        
         setTracks(trackList);
         setCurrentTrack(trackList[0]);
         setTotalTracks(data.total);
@@ -1010,7 +877,7 @@ const PlaylistSorter = ({ accessToken, user }) => {
           [currentId]: initialTrackIds
         }));
         
-        console.log(`Initial load: ${initialTrackIds.size} tracks cached for ${currentId}, total: ${data.total}`);
+        console.log(`Loaded ${initialTrackIds.size} tracks (total: ${data.total})`);
         
         // Immediately start loading remaining tracks if there are more
         // This ensures the cache is complete for accurate existence checks
@@ -1055,17 +922,14 @@ const PlaylistSorter = ({ accessToken, user }) => {
     const updatePlaylistStates = async () => {
       if (!currentTrack) return;
       
-      console.log(`\n=== Updating states for track: ${currentTrack.name} ===`);
+      console.log(`Updating states for track: ${currentTrack.name}`);
       
       // Get list of playlists that need their tracks fetched
-      // Check if they're fully loaded, not just if cache exists
       const playlistsToFetch = [];
       for (const [index, playlist] of Object.entries(selectedPlaylists)) {
         if (!playlist) continue;
-        // Only skip if this playlist has been fully loaded
         if (!fullyLoadedPlaylists.current.has(playlist.id)) {
           playlistsToFetch.push(playlist);
-          console.log(`Playlist "${playlist.name}" needs to be fully loaded`);
         }
       }
       
@@ -1099,8 +963,6 @@ const PlaylistSorter = ({ accessToken, user }) => {
         const trackIds = playlistTracksCache.current[playlist.id];
         const trackExists = trackIds?.has(currentTrack.id) || false;
         
-        console.log(`  ${playlist.name}: exists=${trackExists}, cache_size=${trackIds?.size || 0}`);
-        
         // Check for pending unsaved changes for this track/playlist combo
         const pendingChange = unsavedChanges.find(
           change => change.trackId === currentTrack.id && change.playlistId === playlist.id
@@ -1109,14 +971,11 @@ const PlaylistSorter = ({ accessToken, user }) => {
         // Priority: pending changes override actual state
         if (pendingChange) {
           newSelectedStates[playlist.id] = pendingChange.action === 'add';
-          console.log(`  Pending change: ${pendingChange.action}`);
         } else {
-          // Show actual state from Spotify
           newSelectedStates[playlist.id] = trackExists;
         }
       }
       
-      console.log('Setting states:', newSelectedStates);
       setSelectedStates(newSelectedStates);
     };
 
@@ -1287,6 +1146,11 @@ const PlaylistSorter = ({ accessToken, user }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [activeDropdown, showingSearchBox, showingCreateNew, selectedPlaylists]);
 
+  /**
+   * Add a track to a playlist
+   * @param {string} playlistId - Spotify playlist ID
+   * @param {string} trackId - Spotify track ID
+   */
   const addTrackToPlaylist = async (playlistId, trackId) => {
     try {
       await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
@@ -1305,6 +1169,11 @@ const PlaylistSorter = ({ accessToken, user }) => {
     }
   };
 
+  /**
+   * Remove a track from a playlist
+   * @param {string} playlistId - Spotify playlist ID
+   * @param {string} trackId - Spotify track ID
+   */
   const removeTrackFromPlaylist = async (playlistId, trackId) => {
     try {
       await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
@@ -1371,6 +1240,10 @@ const PlaylistSorter = ({ accessToken, user }) => {
     }
   };
 
+  /**
+   * Filter playlists based on search query
+   * @param {string} query - Search query
+   */
   const handlePlaylistSearch = (query) => {
     if (!userPlaylists?.length) return;
     
@@ -1401,22 +1274,15 @@ const PlaylistSorter = ({ accessToken, user }) => {
       [index]: playlist
     }));
     
-    console.log(`\n=== Selecting playlist "${playlist.name}" ===`);
-    console.log(`Playlist ID: ${playlist.id}`);
-    console.log(`Current track: ${currentTrack.name} (${currentTrack.id})`);
+    console.log(`Selecting playlist: ${playlist.name}`);
     
-    // ALWAYS force refetch when selecting a playlist to ensure we have ALL tracks
-    // This prevents issues with partial caches from previous operations
-    console.log('⚠ Forcing complete refetch to ensure ALL tracks are loaded');
-    
-    // Fetch all tracks from playlist and cache them
+    // Force refetch to ensure we have ALL tracks
     const trackIds = await fetchPlaylistTracks(playlist.id, true);
     
-    // Check if current track exists in this playlist using cached data
+    // Check if current track exists in this playlist
     const trackExists = trackIds?.has(currentTrack.id) || false;
     
-    console.log(`Track exists in playlist: ${trackExists}`);
-    console.log(`Total tracks in playlist: ${trackIds?.size || 0}`);
+    console.log(`Track exists: ${trackExists}, Total tracks: ${trackIds?.size || 0}`);
     
     // Show actual state from Spotify (green if exists, red if not)
     setSelectedStates(prev => ({
@@ -1431,6 +1297,10 @@ const PlaylistSorter = ({ accessToken, user }) => {
     setLoadingMessage('');
   };
 
+  /**
+   * Remove a playlist from selection with unsaved changes check
+   * @param {number} index - Playlist slot index
+   */
   const removePlaylist = (index) => {
     const playlistToRemove = selectedPlaylists[index];
     
@@ -1444,6 +1314,10 @@ const PlaylistSorter = ({ accessToken, user }) => {
     }
   };
 
+  /**
+   * Confirm removal of a playlist from selection
+   * @param {number} index - Playlist slot index
+   */
   const removePlaylistConfirmed = (index) => {
     setSelectedPlaylists(prev => {
       const newPlaylists = {...prev};
@@ -1491,34 +1365,10 @@ const PlaylistSorter = ({ accessToken, user }) => {
         };
       });
       
-      if (SHOW_AUDIO_FEATURES) {
-        const trackIds = newTracks.map(track => track.id).join(',');
-        try {
-          const audioResponse = await fetch(
-            `https://api.spotify.com/v1/audio-features?ids=${trackIds}`, {
-              headers: { 'Authorization': `Bearer ${accessToken}` }
-            }
-          );
-
-          if (audioResponse.ok) {
-            const { audio_features } = await audioResponse.json();
-            const newCache = {};
-            audio_features.forEach((features, index) => {
-              if (features) {
-                newCache[newTracks[index].id] = features;
-              }
-            });
-            setAudioFeaturesCache(prev => ({...prev, ...newCache}));
-          }
-        } catch (error) {
-          console.error('Error fetching audio features:', error);
-        }
-      }
-      
       setTracks(prev => [...prev, ...newTracks]);
       setNextTracksUrl(data.next);
 
-      console.log(`Loaded ${newTracks.length} more tracks. Total cached for ${currentId}: ${playlistTracksCache.current[currentId]?.size || 0}`);
+      console.log(`Loaded ${newTracks.length} more tracks`);
 
       if (newTracks.length < 25 && data.next) {
         fetchMoreTracks();
@@ -1530,6 +1380,10 @@ const PlaylistSorter = ({ accessToken, user }) => {
     }
   };
 
+  /**
+   * Get list of playlists that haven't been selected yet
+   * @returns {Array} Available playlists
+   */
   const getAvailablePlaylists = () => {
     const selectedIds = Object.values(selectedPlaylists)
       .filter(Boolean)
@@ -1539,22 +1393,17 @@ const PlaylistSorter = ({ accessToken, user }) => {
     );
   };
 
+  /**
+   * Create a new playlist for the current user
+   * @param {string} name - Name of the playlist to create
+   * @returns {Object|null} The newly created playlist or null on error
+   */
   const createNewPlaylist = async (name) => {
     try {
-      // First get the user's ID
-      const userResponse = await fetch('https://api.spotify.com/v1/me', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-      
-      if (!userResponse.ok) {
-        throw new Error('Failed to fetch user data');
+      if (!userData?.id) {
+        throw new Error('User data not available');
       }
       
-      const userData = await userResponse.json();
-      
-      // Create the playlist
       const createResponse = await fetch(`https://api.spotify.com/v1/users/${userData.id}/playlists`, {
         method: 'POST',
         headers: {
@@ -1600,6 +1449,11 @@ const PlaylistSorter = ({ accessToken, user }) => {
     }
   };
 
+  /**
+   * Handle keyboard events in playlist search box
+   * @param {Event} e - Keyboard event
+   * @param {number} index - Playlist slot index
+   */
   const handleSearchKeyDown = (e, index) => {
     if (e.key === 'Escape') {
       setShowingSearchBox(prev => ({...prev, [index]: false}));
@@ -1622,13 +1476,13 @@ const PlaylistSorter = ({ accessToken, user }) => {
     
     // Check if playlist is fully loaded and cached (unless forcing refetch)
     if (!forceRefetch && fullyLoadedPlaylists.current.has(playlistId)) {
-      console.log(`Using cached tracks for ${playlistId}: ${playlistTracksCache.current[playlistId]?.size || 0} tracks (fully loaded)`);
+      console.log(`Using cached tracks for playlist: ${playlistTracksCache.current[playlistId]?.size || 0} tracks`);
       return playlistTracksCache.current[playlistId];
     }
     
     // If a fetch is already ongoing for this playlist, wait for it
     if (ongoingFetches.current.has(playlistId)) {
-      console.log(`Fetch already in progress for ${playlistId}, waiting...`);
+      console.log(`Fetch in progress, waiting...`);
       return ongoingFetches.current.get(playlistId);
     }
     
@@ -1637,19 +1491,17 @@ const PlaylistSorter = ({ accessToken, user }) => {
       fullyLoadedPlaylists.current.delete(playlistId);
     }
     
-    console.log(`Fetching all tracks for playlist ${playlistId}${forceRefetch ? ' (forced refetch)' : ''}...`);
+    console.log(`Fetching playlist tracks${forceRefetch ? ' (forced)' : ''}...`);
     
     // Create a promise for this fetch and store it
     const fetchPromise = (async () => {
       try {
         let allTrackIds = new Set();
-        let trackDetails = []; // Store track info for debugging
-        // Use fields parameter to fetch only Spotify URLs for efficiency
-        let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50&fields=items(track(external_urls.spotify)),next,offset,limit,total`;
+        let trackDetails = [];
+        let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50&fields=items(track(external_urls.spotify)),next,total`;
         let pageCount = 0;
-        let initialTotal = null; // Track the initial total from first page
         let currentTotal = 0;
-        const MAX_PAGES = 200; // Safety limit: 200 pages * 50 tracks = 10,000 tracks max
+        const MAX_PAGES = 200;
         
         /**
          * Extracts track ID from Spotify URL
@@ -1666,7 +1518,6 @@ const PlaylistSorter = ({ accessToken, user }) => {
         // Fetch all pages of tracks
         while (nextUrl && pageCount < MAX_PAGES) {
           pageCount++;
-          console.log(`  Fetching page ${pageCount} for ${playlistId}...`);
           
           const response = await fetch(nextUrl, {
             headers: {
@@ -1680,94 +1531,38 @@ const PlaylistSorter = ({ accessToken, user }) => {
           }
           
           const data = await response.json();
-          
-          console.log(`  📊 API Response Debug for page ${pageCount}:`);
-          console.log(`     - data.items.length: ${data.items?.length || 0}`);
-          console.log(`     - data.total: ${data.total}`);
-          console.log(`     - data.offset: ${data.offset}`);
-          console.log(`     - data.limit: ${data.limit}`);
-          console.log(`     - data.next: ${data.next ? 'EXISTS' : 'NULL'}`);
-          if (data.next) {
-            // Extract offset from next URL for debugging
-            const nextUrlObj = new URL(data.next);
-            const nextOffset = nextUrlObj.searchParams.get('offset');
-            const nextLimit = nextUrlObj.searchParams.get('limit');
-            console.log(`     - Next will request: offset=${nextOffset}, limit=${nextLimit}`);
-          }
-          
-          // Store the initial total from the first page
-          if (initialTotal === null) {
-            initialTotal = data.total;
-          }
           currentTotal = data.total;
           
-          // Add track IDs from this page with detailed tracking
-          let pageTrackCount = 0;
-          let nullTracks = 0;
-          let tracksWithoutId = 0;
-          let duplicateTracks = 0;
-          
-          data.items.forEach((item, idx) => {
-            if (!item.track) {
-              nullTracks++;
-            } else if (!item.track.external_urls?.spotify) {
-              tracksWithoutId++;
-              console.log(`     - Track at index ${idx} has no Spotify URL`);
-            } else {
-              // Extract track ID from Spotify URL
+          // Add track IDs from this page
+          data.items.forEach(item => {
+            if (item.track?.external_urls?.spotify) {
               const trackId = extractTrackIdFromUrl(item.track.external_urls.spotify);
-              if (!trackId) {
-                tracksWithoutId++;
-                console.log(`     - Track at index ${idx} has invalid Spotify URL:`, item.track.external_urls.spotify);
-              } else {
-                const sizeBefore = allTrackIds.size;
+              if (trackId) {
                 allTrackIds.add(trackId);
-                if (allTrackIds.size === sizeBefore) {
-                  duplicateTracks++;
-                } else {
-                  pageTrackCount++;
-                  // Store track details for debugging
-                  trackDetails.push({
-                    id: trackId,
-                    url: item.track.external_urls.spotify
-                  });
-                }
+                trackDetails.push({
+                  id: trackId,
+                  url: item.track.external_urls.spotify
+                });
               }
             }
           });
           
-          console.log(`  📈 Page ${pageCount} Results:`);
-          console.log(`     - Valid tracks added: ${pageTrackCount}`);
-          console.log(`     - Null tracks: ${nullTracks}`);
-          console.log(`     - Tracks without ID: ${tracksWithoutId}`);
-          console.log(`     - Duplicate tracks: ${duplicateTracks}`);
-          console.log(`     - Total unique tracks so far: ${allTrackIds.size}/${currentTotal}`);
+          console.log(`Page ${pageCount}: ${allTrackIds.size}/${currentTotal} tracks loaded`);
           
-          // Use Spotify's next URL - trust the API response
+          // Use Spotify's next URL
           nextUrl = data.next;
           
           if (nextUrl) {
-            console.log(`     - Next URL exists, continuing to page ${pageCount + 1}...`);
             // Add small delay to avoid rate limiting
             await new Promise(resolve => setTimeout(resolve, 100));
-          } else {
-            console.log(`     - No next URL, pagination complete`);
           }
         }
         
-        // Warn if we hit the page limit
         if (pageCount >= MAX_PAGES && nextUrl) {
-          console.warn(`⚠ Hit maximum page limit (${MAX_PAGES}) for ${playlistId}. Some tracks may not be fetched.`);
+          console.warn(`Hit maximum page limit (${MAX_PAGES}) for playlist. Some tracks may not be fetched.`);
         }
         
-        console.log(`\n✓ FETCH SUMMARY for ${playlistId}:`);
-        console.log(`   - Pages fetched: ${pageCount}`);
-        console.log(`   - Unique tracks collected: ${allTrackIds.size}`);
-        console.log(`   - API reported total: ${currentTotal}`);
-        console.log(`\n   📋 Sample tracks (first 10 of ${trackDetails.length}):`);
-        trackDetails.slice(0, 10).forEach((track, i) => {
-          console.log(`      ${i + 1}. [${track.id}] ${track.url}`);
-        });
+        console.log(`Loaded ${allTrackIds.size} tracks from ${pageCount} pages for playlist ${playlistId}`);
         
         // Cache in ref (synchronous)
         playlistTracksCache.current[playlistId] = allTrackIds;
@@ -1780,7 +1575,6 @@ const PlaylistSorter = ({ accessToken, user }) => {
         
         // Mark this playlist as fully loaded
         fullyLoadedPlaylists.current.add(playlistId);
-        console.log(`Marked ${playlistId} as fully loaded`);
         
         return allTrackIds;
       } catch (error) {
@@ -1798,6 +1592,10 @@ const PlaylistSorter = ({ accessToken, user }) => {
     return fetchPromise;
   };
 
+  /**
+   * Handle track number input for jumping to specific track
+   * @param {Event} e - Input change event
+   */
   const handleTrackNumberInput = (e) => {
     const value = e.target.value;
     setJumpToTrack(value);
@@ -1809,60 +1607,11 @@ const PlaylistSorter = ({ accessToken, user }) => {
     }
   };
 
-  const getColorPalette = async (imageUrl) => {
-    try {
-      const img = document.createElement('img');
-      img.crossOrigin = 'Anonymous';
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = imageUrl;
-      });
-      
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const sampleSize = 100;
-      canvas.width = sampleSize;
-      canvas.height = sampleSize;
-      
-      ctx.drawImage(img, 0, 0, sampleSize, sampleSize);
-      
-      const imageData = ctx.getImageData(0, 0, sampleSize, sampleSize).data;
-      const colors = [];
-      
-      const samplePoints = [
-        { x: 0, y: 0 },                    // Top left
-        { x: sampleSize - 1, y: 0 },       // Top right
-        { x: sampleSize - 1, y: sampleSize - 1 }, // Bottom right
-        { x: 0, y: sampleSize - 1 },       // Bottom left
-        { x: Math.floor(sampleSize / 2), y: Math.floor(sampleSize / 2) } // Center
-      ];
-      
-      for (const point of samplePoints) {
-        const i = (point.y * sampleSize + point.x) * 4;
-        const r = imageData[i];
-        const g = imageData[i + 1];
-        const b = imageData[i + 2];
-        colors.push(`rgba(${r},${g},${b},0.8)`);
-      }
-      
-      return colors;
-    } catch (error) {
-      console.error('Error generating color palette:', error);
-      return ['rgba(30,30,30,0.8)', 'rgba(50,50,50,0.8)', 'rgba(70,70,70,0.8)', 'rgba(40,40,40,0.8)', 'rgba(60,60,60,0.8)'];
-    }
-  };
-
-  useEffect(() => {
-    if (currentTrack?.album?.images?.[0]?.url) {
-      getColorPalette(currentTrack.album.images[0].url)
-        .then(colors => setBackgroundColors(colors));
-    }
-  }, [currentTrack]);
-
+  /**
+   * Handle back button click with unsaved changes check
+   */
   const handleBack = () => {
-    const hasUnsavedChanges = unsavedChanges.length > 0;
-    if (hasUnsavedChanges) {
+    if (unsavedChanges.length > 0) {
       setShowUnsavedPopup(true);
       setPendingAction('back');
     } else {
@@ -1870,9 +1619,11 @@ const PlaylistSorter = ({ accessToken, user }) => {
     }
   };
 
+  /**
+   * Handle profile button click with unsaved changes check
+   */
   const handleProfileClick = () => {
-    const hasUnsavedChanges = unsavedChanges.length > 0;
-    if (hasUnsavedChanges) {
+    if (unsavedChanges.length > 0) {
       setShowUnsavedPopup(true);
       setPendingAction('settings');
     } else {
@@ -1880,30 +1631,33 @@ const PlaylistSorter = ({ accessToken, user }) => {
     }
   };
 
+  /**
+   * Handle popup action (save/discard/cancel)
+   * @param {string} action - Action to perform
+   */
   const handlePopupAction = async (action) => {
     if (action === 'save') {
       await handleSave();
-      if (pendingAction === 'back') {
-        history.push('/main');
-      } else if (pendingAction === 'settings') {
-        history.push('/settings');
-      } else if (pendingAction.type === 'removePlaylist') {
-        removePlaylistConfirmed(pendingAction.index);
-      }
     } else if (action === 'discard') {
-      if (pendingAction === 'back') {
-        history.push('/main');
-      } else if (pendingAction === 'settings') {
-        history.push('/settings');
-      } else if (pendingAction.type === 'removePlaylist') {
-        removePlaylistConfirmed(pendingAction.index);
-      }
       setUnsavedChanges([]);
     }
+
+    // Execute pending action after save/discard
+    if (pendingAction === 'back') {
+      history.push('/main');
+    } else if (pendingAction === 'settings') {
+      history.push('/settings');
+    } else if (pendingAction?.type === 'removePlaylist') {
+      removePlaylistConfirmed(pendingAction.index);
+    }
+
     setShowUnsavedPopup(false);
     setPendingAction(null);
   };
 
+  /**
+   * Handle navigation from local file error popup
+   */
   const handleLocalFileNext = () => {
     setShowLocalFileError(false);
     handleNext();
@@ -1914,6 +1668,9 @@ const PlaylistSorter = ({ accessToken, user }) => {
     handlePrevious();
   };
 
+  /**
+   * Fetch artist data for the current track
+   */
   useEffect(() => {
     const fetchArtistData = async () => {
       if (!currentTrack) return;
@@ -1931,17 +1688,7 @@ const PlaylistSorter = ({ accessToken, user }) => {
 
         const artist = await artistResponse.json();
         setArtistData(artist);
-        
-        // Set initial track metadata (even if we're not showing audio features)
-        setTrackMetadata({
-          tempo: 0,
-          acousticness: 0,
-          danceability: 0,
-          energy: 0,
-          instrumentalness: 0,
-          loudness: 0,
-          valence: 0
-        });
+        setTrackMetadata({});
       } catch (error) {
         console.error('Error fetching artist data:', error);
       }
@@ -1950,15 +1697,20 @@ const PlaylistSorter = ({ accessToken, user }) => {
     fetchArtistData();
   }, [currentTrack, accessToken]);
 
-  if (!currentTrack || !trackMetadata || !artistData) {
+  if (!currentTrack || !artistData) {
     return (
-      <GlobalLoadingOverlay>
-        <LoadingSpinner />
-        <LoadingText>Loading...</LoadingText>
-      </GlobalLoadingOverlay>
+      <>
+        <GlobalStyle />
+        <LoadingOverlay message="Loading playlist..." />
+      </>
     );
   }
 
+  /**
+   * Format duration from milliseconds to MM:SS
+   * @param {number} ms - Duration in milliseconds
+   * @returns {string} Formatted duration
+   */
   const formatDuration = (ms) => {
     const minutes = Math.floor(ms / 60000);
     const seconds = ((ms % 60000) / 1000).toFixed(0);
@@ -1968,7 +1720,12 @@ const PlaylistSorter = ({ accessToken, user }) => {
   return (
     <>
       <GlobalStyle />
-      <PageContainer albumArt={currentTrack?.album?.images?.[0]?.url}>
+      {/* Background layers for smooth crossfade */}
+      <BackgroundLayer src={previousBackground} visible={!!previousBackground && !backgroundLoaded} />
+      <BackgroundLayer src={currentBackground} visible={backgroundLoaded} />
+      <BackgroundOverlay />
+      
+      <PageContainer>
         <ProgressBar 
           progress={currentIndex + 1} 
           total={totalTracks}
@@ -1995,9 +1752,9 @@ const PlaylistSorter = ({ accessToken, user }) => {
             style={{
               animation:
                 slideDirection === 'next'
-                  ? 'trackSlideNext 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                  ? 'trackSlideNext 0.25s ease-out'
                   : slideDirection === 'prev'
-                  ? 'trackSlidePrev 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                  ? 'trackSlidePrev 0.25s ease-out'
                   : 'none',
             }}
           >
@@ -2233,10 +1990,7 @@ const PlaylistSorter = ({ accessToken, user }) => {
       </PageContainer>
       
       {isLoadingPlaylistData && (
-        <GlobalLoadingOverlay>
-          <LoadingSpinner />
-          <LoadingText>{loadingMessage || 'Loading playlist data...'}</LoadingText>
-        </GlobalLoadingOverlay>
+        <LoadingOverlay message={loadingMessage || 'Loading playlist data...'} />
       )}
     </>
   );
