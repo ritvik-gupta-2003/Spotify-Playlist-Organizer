@@ -1,3 +1,7 @@
+/**
+ * LoginPage component displays Spotify login button
+ * Initiates OAuth flow when clicked
+ */
 import React from 'react';
 import styled from 'styled-components';
 import { API_URL } from '../config';
@@ -20,14 +24,23 @@ const LoginButton = styled.button`
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;
-  transition: transform 0.2s ease;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
 
   &:hover {
-    transform: scale(1.05);
+    transform: scale3d(1.05, 1.05, 1);
   }
 `;
 
+/**
+ * Login page component with Spotify authentication
+ */
 const LoginPage = () => {
+  /**
+   * Handle Spotify login button click
+   * Redirects to Spotify authorization page
+   */
   const handleLogin = async () => {
     try {
       console.log('Attempting login request...');

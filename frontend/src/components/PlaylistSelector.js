@@ -14,14 +14,16 @@ const PlaylistCard = styled.div`
   border-radius: 12px;
   padding: 16px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   opacity: 0;
-  animation: fadeIn 0.4s ease-out forwards;
-  animation-delay: ${props => (props.index || 0) * 0.05}s;
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation-delay: ${props => (props.index || 0) * 0.04}s;
 
   &:hover {
-    transform: translateY(-4px);
+    transform: translate3d(0, -4px, 0);
     background-color: #383838;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
@@ -29,17 +31,17 @@ const PlaylistCard = styled.div`
   &:focus-visible {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
-    transform: translateY(-4px);
+    transform: translate3d(0, -4px, 0);
   }
 
   @keyframes fadeIn {
     from {
       opacity: 0;
-      transform: translateY(20px);
+      transform: translate3d(0, 20px, 0);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translate3d(0, 0, 0);
     }
   }
 `;
@@ -58,7 +60,9 @@ const PlaylistImage = styled.div`
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s ease;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+    backface-visibility: hidden;
   }
 
   &::after {
@@ -75,7 +79,7 @@ const PlaylistImage = styled.div`
 
 const PlaylistCardHover = styled(PlaylistCard)`
   &:hover ${PlaylistImage} img {
-    transform: scale(1.05);
+    transform: scale3d(1.05, 1.05, 1);
   }
 `;
 
@@ -100,70 +104,14 @@ const LibraryCard = styled(PlaylistCard)`
   }
 `;
 
-const CreatePlaylistBox = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--surface-color);
-  border-radius: 8px;
-  padding: 20px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  height: 100%;
-
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
-`;
-
-const PlaylistInput = styled.input`
-  width: 100%;
-  padding: 12px;
-  background-color: #1a1a1a;
-  border: none;
-  border-radius: 4px;
-  color: var(--text-primary);
-  margin-top: 10px;
-  
-  &:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px var(--primary-color);
-  }
-`;
-
-const CloseButton = styled.button`
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: none;
-  border: none;
-  color: #e91429;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 4px;
-  
-  &:hover {
-    opacity: 0.8;
-  }
-`;
-
-const PlaylistSelector = ({ playlists = [], onSelect, includeLibrary }) => {
+/**
+ * Renders a grid of playlist cards with hover effects
+ * @param {Array} playlists - Array of playlist objects to display
+ * @param {Function} onSelect - Callback function when a playlist is selected
+ */
+const PlaylistSelector = ({ playlists = [], onSelect }) => {
   return (
     <PlaylistGrid>
-      {includeLibrary && (
-        <LibraryCard onClick={() => onSelect('liked')} index={0}>
-          <PlaylistImage>
-            <img 
-              src={LikedSongsIcon}
-              alt="Liked Songs"
-            />
-          </PlaylistImage>
-          <PlaylistName>Liked Songs</PlaylistName>
-          <PlaylistInfo>Your Library</PlaylistInfo>
-        </LibraryCard>
-      )}
-      
       {playlists?.map((playlist, index) => (
         <PlaylistCardHover 
           key={playlist.id}

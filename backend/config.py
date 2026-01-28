@@ -1,3 +1,8 @@
+"""
+Configuration module for Spotify API credentials and settings
+Loads environment variables from .env file
+"""
+
 import os
 from dotenv import load_dotenv
 from pathlib import Path

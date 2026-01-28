@@ -1,7 +1,15 @@
+/**
+ * CallbackPage component handles Spotify OAuth callback
+ * Exchanges authorization code for access tokens
+ */
 import React, { useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import { API_URL } from '../config';
 
+/**
+ * Callback page for Spotify OAuth flow
+ * Handles the redirect from Spotify authorization
+ */
 const CallbackPage = () => {
   const history = useHistory();
 

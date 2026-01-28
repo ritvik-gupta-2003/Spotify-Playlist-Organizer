@@ -1,3 +1,6 @@
+/**
+ * SettingsPage component displays user profile and logout option
+ */
 import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
@@ -48,10 +51,12 @@ const LogoutButton = styled.button`
   border-radius: 20px;
   cursor: pointer;
   font-weight: bold;
-  transition: transform 0.2s ease;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
 
   &:hover {
-    transform: scale(1.05);
+    transform: scale3d(1.05, 1.05, 1);
   }
 `;
 
@@ -67,7 +72,8 @@ const BackButton = styled.button`
   padding: 8px 16px;
   border-radius: 20px;
   margin-bottom: 20px;
-  transition: background-color 0.2s;
+  transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: background-color;
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.1);
@@ -92,10 +98,18 @@ const DefaultAvatar = styled.div`
   }
 `;
 
+/**
+ * Settings page showing user profile and logout button
+ * @param {Object} user - User data from Spotify
+ * @param {Function} onLogout - Logout callback function
+ */
 const SettingsPage = ({ user, onLogout }) => {
   const history = useHistory();
   const [localUser, setLocalUser] = useState(user || history.location.state?.user);
   
+  /**
+   * Fetch user data if not provided via props
+   */
   useEffect(() => {
     const fetchUserData = async () => {
       try {

@@ -1,3 +1,8 @@
+"""
+Spotify Playlist Organizer Backend
+Flask application that handles Spotify OAuth and token management
+"""
+
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 import requests
@@ -41,7 +46,9 @@ else:
 
 @app.after_request
 def after_request(response):
-    # Log the request details for debugging
+    """
+    Log request details after each request for debugging
+    """
     origin = request.headers.get('Origin')
     print(f"Request Origin: {origin}")
     print(f"Is Development: {is_development}")
@@ -50,6 +57,10 @@ def after_request(response):
 
 @app.route('/login', methods=['GET', 'OPTIONS'])
 def login():
+    """
+    Generate Spotify authorization URL
+    Returns URL for client to redirect user to Spotify login
+    """
     print(f"Login endpoint hit with method: {request.method}")
     print(f"Request headers: {dict(request.headers)}")
     print(f"Origin: {request.headers.get('Origin')}")
@@ -89,6 +100,10 @@ def login():
 
 @app.route('/callback')
 def callback():
+    """
+    Handle Spotify OAuth callback
+    Exchanges authorization code for access and refresh tokens
+    """
     code = request.args.get('code')
     error = request.args.get('error')
     
@@ -123,19 +138,21 @@ def callback():
         error_msg = response.json().get('error_description', 'Failed to get tokens')
         print(f"Token exchange failed: {error_msg}")
         print(f"Response: {response.text}")
-        error_response = jsonify({'error': error_msg})
-        return error_response, response.status_code
+        return jsonify({'error': error_msg}), response.status_code
         
     return jsonify(response.json())
 
 @app.route('/refresh_token', methods=['POST', 'OPTIONS'])
 def refresh_token():
+    """
+    Refresh expired access token using refresh token
+    Returns new access token
+    """
     data = request.get_json()
     refresh_token = data.get('refresh_token')
     
     if not refresh_token:
-        error_response = jsonify({'error': 'No refresh token provided'})
-        return error_response, 400
+        return jsonify({'error': 'No refresh token provided'}), 400
         
     auth_header = base64.urlsafe_b64encode(
         f"{config.SPOTIFY_CLIENT_ID}:{config.SPOTIFY_CLIENT_SECRET}".encode()
@@ -155,14 +172,17 @@ def refresh_token():
     
     if response.status_code != 200:
         print("FAILED TO REFRESH TOKEN")
-        error_response = jsonify({'error': 'Failed to refresh token'})
-        return error_response, response.status_code
+        return jsonify({'error': 'Failed to refresh token'}), response.status_code
     
     print("REFRESHED TOKEN")
     return jsonify(response.json())
 
 @app.route('/')
 def home():
+    """
+    Health check endpoint
+    Returns API status
+    """
     return jsonify({
         'status': 'online',
         'message': 'Spotify Playlist Backend API is running'

@@ -1,3 +1,7 @@
+/**
+ * MainPage component displays user's playlists and allows playlist selection
+ * Includes search, create playlist, and profile features
+ */
 import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
@@ -47,48 +51,18 @@ const SearchInput = styled.input`
   color: var(--text-primary);
   width: 300px;
   font-size: 16px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
 
   &:focus {
     outline: none;
     box-shadow: 0 0 0 2px var(--primary-color);
-    transform: scale(1.02);
+    transform: scale3d(1.02, 1.02, 1);
   }
 
   &::placeholder {
     color: var(--text-secondary);
-  }
-`;
-
-const CreatePlaylistBox = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--surface-color);
-  border-radius: 8px;
-  padding: 20px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  height: 100%;
-
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
-`;
-
-const PlaylistInput = styled.input`
-  width: 100%;
-  padding: 12px;
-  background-color: #1a1a1a;
-  border: none;
-  border-radius: 4px;
-  color: var(--text-primary);
-  margin-top: 10px;
-  
-  &:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px var(--primary-color);
   }
 `;
 
@@ -166,11 +140,13 @@ const CreateButton = styled.button`
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
   box-shadow: 0 2px 8px rgba(29, 185, 84, 0.2);
 
   &:hover {
-    transform: scale(1.05);
+    transform: scale3d(1.05, 1.05, 1);
     box-shadow: 0 4px 12px rgba(29, 185, 84, 0.4);
   }
 `;
@@ -212,10 +188,12 @@ const ProfileButton = styled.button`
   border: none;
   cursor: pointer;
   overflow: hidden;
-  transition: transform 0.2s ease;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
 
   &:hover {
-    transform: scale(1.1);
+    transform: scale3d(1.1, 1.1, 1);
   }
 
   img {
@@ -225,6 +203,11 @@ const ProfileButton = styled.button`
   }
 `;
 
+/**
+ * Main page showing all user playlists
+ * @param {string} accessToken - Spotify access token
+ * @param {Object} user - User data from Spotify
+ */
 const MainPage = ({ accessToken, user }) => {
   const [playlists, setPlaylists] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -237,28 +220,30 @@ const MainPage = ({ accessToken, user }) => {
   const history = useHistory();
 
   useEffect(() => {
+    /**
+     * Fetch user data if not already provided
+     */
     const fetchUserData = async () => {
-      try {
-        const response = await fetch('https://api.spotify.com/v1/me', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          }
-        });
+      if (!localUser && accessToken) {
+        try {
+          const response = await fetch('https://api.spotify.com/v1/me', {
+            headers: {
+              Authorization: `Bearer ${accessToken}`
+            }
+          });
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const userData = await response.json();
-        setLocalUser(userData);
-      } catch (error) {
-        console.error('User data fetch error:', error);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const userData = await response.json();
+          setLocalUser(userData);
+        } catch (error) {
+          console.error('User data fetch error:', error);
+        }
       }
     };
 
-    if (!localUser && accessToken) {
-      fetchUserData();
-    }
-  }, [accessToken, localUser]);
-
-  useEffect(() => {
+    /**
+     * Fetch total count of liked songs
+     */
     const fetchLikedSongs = async () => {
       try {
         const response = await fetch('https://api.spotify.com/v1/me/tracks?limit=1', {
@@ -320,11 +305,16 @@ const MainPage = ({ accessToken, user }) => {
     };
 
     if (accessToken) {
+      fetchUserData();
       fetchLikedSongs();
       fetchAllPlaylists();
     }
-  }, [accessToken]);
+  }, [accessToken, localUser]);
 
+  /**
+   * Handle playlist selection and navigate to sort page
+   * @param {string} playlistId - ID of the selected playlist
+   */
   const handlePlaylistSelect = (playlistId) => {
     const selectedPlaylist = playlists.find(p => p.id === playlistId);
     
@@ -340,27 +330,26 @@ const MainPage = ({ accessToken, user }) => {
     });
   };
 
-  const filteredPlaylists = playlists
-    .filter(playlist => 
-      playlist.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      playlist.name !== 'DJ'
-    );
+  /**
+   * Filter playlists based on search query
+   */
+  const filteredPlaylists = playlists.filter(playlist => 
+    playlist.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    playlist.name !== 'DJ'
+  );
 
+  /**
+   * Create a new playlist for the current user
+   * @param {string} name - Name of the playlist to create
+   * @returns {Object|null} The newly created playlist or null on error
+   */
   const createNewPlaylist = async (name) => {
     try {
-      const userResponse = await fetch('https://api.spotify.com/v1/me', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-      
-      if (!userResponse.ok) {
-        throw new Error('Failed to fetch user data');
+      if (!localUser?.id) {
+        throw new Error('User data not available');
       }
       
-      const userData = await userResponse.json();
-      
-      const createResponse = await fetch(`https://api.spotify.com/v1/users/${userData.id}/playlists`, {
+      const createResponse = await fetch(`https://api.spotify.com/v1/users/${localUser.id}/playlists`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,

@@ -1,3 +1,7 @@
+/**
+ * AudioPlayer component for playing track previews
+ * Displays play/pause controls and progress bar
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import PlayArrowIcon from '@material-ui/icons/PlayArrow';
@@ -28,9 +32,12 @@ const PlayButton = styled.button`
   justify-content: center;
   border-radius: 50%;
   background-color: var(--primary-color);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
   
   &:hover {
-    transform: scale(1.1);
+    transform: scale3d(1.1, 1.1, 1);
   }
 `;
 
@@ -48,6 +55,8 @@ const Progress = styled.div`
   background-color: var(--primary-color);
   border-radius: 2px;
   position: relative;
+  will-change: width;
+  backface-visibility: hidden;
   
   &::after {
     content: '';
@@ -59,6 +68,7 @@ const Progress = styled.div`
     background-color: var(--primary-color);
     border-radius: 50%;
     display: none;
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   &:hover::after {
@@ -72,6 +82,13 @@ const TimeDisplay = styled.div`
   min-width: 45px;
 `;
 
+/**
+ * Audio player component with play/pause controls and progress bar
+ * @param {string} trackUri - Spotify track URI
+ * @param {boolean} isPlaying - Whether the track is currently playing
+ * @param {Function} setIsPlaying - Function to update playing state
+ * @param {string} accessToken - Spotify access token
+ */
 const AudioPlayer = ({ trackUri, isPlaying, setIsPlaying, accessToken }) => {
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -109,6 +126,9 @@ const AudioPlayer = ({ trackUri, isPlaying, setIsPlaying, accessToken }) => {
     }
   }, [isPlaying]);
 
+  /**
+   * Update progress state when audio time changes
+   */
   const handleTimeUpdate = () => {
     if (audioRef.current) {
       setProgress(audioRef.current.currentTime);
@@ -116,6 +136,10 @@ const AudioPlayer = ({ trackUri, isPlaying, setIsPlaying, accessToken }) => {
     }
   };
 
+  /**
+   * Handle click on progress bar to seek
+   * @param {Event} e - Click event
+   */
   const handleProgressClick = (e) => {
     if (progressRef.current && audioRef.current) {
       const rect = progressRef.current.getBoundingClientRect();
@@ -127,6 +151,11 @@ const AudioPlayer = ({ trackUri, isPlaying, setIsPlaying, accessToken }) => {
     }
   };
 
+  /**
+   * Format time in seconds to MM:SS
+   * @param {number} seconds - Time in seconds
+   * @returns {string} Formatted time
+   */
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
